@@ -79,7 +79,7 @@ func get_kvs(w http.ResponseWriter, r *http.Request) {
 			json.NewEncoder(w).Encode(struct {
 				Value   string        `json:"val"`
 				Version vclock.VClock `json:"causal-metadata"`
-			}{value, key.Version})
+			}{value, item.Version})
 			return
 		}
 	}
