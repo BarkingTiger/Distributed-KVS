@@ -1,0 +1,6 @@
+git.tu-berlin.de/mcc-fred/vclock v0.1.1 h1:Hu8Hv1xiAATjLE3mEPcCNleaFO/0dwDXsZ6iiAWkVvk=
+git.tu-berlin.de/mcc-fred/vclock v0.1.1/go.mod h1:SN5Vc2pAvwCikEtTOq1zM5Fte8GL46MDcNbC/mGJqkU=
+github.com/gorilla/mux v1.8.0 h1:i40aqfkR1h2SlN9hojwV5ZA91wcXFOvkdNIeFDP5koI=
+github.com/gorilla/mux v1.8.0/go.mod h1:DVbg23sWSpFRCP0SfiEN6jmj59UnW/n46BH5rLB71So=
+golang.org/x/exp v0.0.0-20230310171629-522b1b587ee0 h1:LGJsf5LRplCck6jUCH3dBL2dmycNruWNF5xugkSlfXw=
+golang.org/x/exp v0.0.0-20230310171629-522b1b587ee0/go.mod h1:CxIveKay+FTh1D0yPZemJVgC/95VzuuOLq5Qi4xnoYc=
