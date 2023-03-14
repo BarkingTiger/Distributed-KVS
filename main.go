@@ -354,7 +354,7 @@ func gossip_view(v []string) {
 			continue
 		}
 		url := "http://" + current.View[i] + "/gossip/view"
-		view_marshalled, _ := json.Marshal(keys)
+		view_marshalled, _ := json.Marshal(current.View)
 		r, err := http.NewRequest("PUT", url, strings.NewReader(string(view_marshalled)))
 		if err != nil {
 			continue
