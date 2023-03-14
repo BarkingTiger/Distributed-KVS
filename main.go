@@ -31,6 +31,7 @@ var keys []KVS
 
 var current Views
 
+// check if a version vclock is greater/equal to request
 func check_version(r vclock.VClock) bool {
 	for _, k := range keys {
 		if k.Version.Compare(r, vclock.Descendant|vclock.Equal) {
@@ -203,6 +204,7 @@ func handle_kvs(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// handler for view functions
 func handle_kvs_view(w http.ResponseWriter, r *http.Request) {
 
 	switch r.Method {
@@ -251,6 +253,7 @@ func pass_kvs(w http.ResponseWriter, r *http.Request) {
 }
 */
 
+// returns the current view
 func get_kvs_view(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(200)
 	json.NewEncoder(w).Encode(struct {
@@ -258,6 +261,7 @@ func get_kvs_view(w http.ResponseWriter, r *http.Request) {
 	}{current.View})
 }
 
+// sets the node view
 func create_kvs_view(w http.ResponseWriter, r *http.Request) {
 	var viewList Views
 	oldList := current.View
@@ -288,6 +292,7 @@ func create_kvs_view(w http.ResponseWriter, r *http.Request) {
 	//pass_view()
 }
 
+// deletes the node view
 func delete_kvs_view(w http.ResponseWriter, r *http.Request) {
 	inView = false
 	keys = nil
@@ -297,6 +302,7 @@ func delete_kvs_view(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(200)
 }
 
+// for testing purposes this prints out the KVS
 func test(v []KVS) {
 	if !inView {
 		return
@@ -306,6 +312,7 @@ func test(v []KVS) {
 	fmt.Println(inView)
 }
 
+// custom function for checking if arrays are equal
 func testEq(a, b []string) bool {
 	if len(a) != len(b) {
 		return false
@@ -320,6 +327,7 @@ func testEq(a, b []string) bool {
 	return true
 }
 
+// gossips to other nodes about what KVS it has
 func gossip_kvs(v []KVS) {
 	if !inView {
 		return
@@ -342,6 +350,7 @@ func gossip_kvs(v []KVS) {
 	}
 }
 
+// compares the KVS and updates it accordingly
 func compare_kvs(w http.ResponseWriter, r *http.Request) {
 	var k []KVS
 	_ = json.NewDecoder(r.Body).Decode(&k)
@@ -380,6 +389,7 @@ func compare_kvs(w http.ResponseWriter, r *http.Request) {
 	keys = mergedKeys
 }
 
+// starts gossiping
 func start_gossip() {
 	interal := 1
 	ticker = *time.NewTicker(time.Duration(interal) * time.Second)
