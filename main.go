@@ -33,11 +33,15 @@ var current Views
 
 // check if a version vclock is greater/equal to request
 func check_version(r vclock.VClock) bool {
+	//for all the keys, check if a local key is equal or a descendant of the request key
+	//idk if this works
 	for _, k := range keys {
+		//if so return true
 		if k.Version.Compare(r, vclock.Descendant|vclock.Equal) {
 			return true
 		}
 	}
+	//else false
 	return false
 }
 
@@ -57,6 +61,8 @@ func get_kvs(w http.ResponseWriter, r *http.Request) {
 	var key KVS
 	_ = json.NewDecoder(r.Body).Decode(&key)
 
+	//if there's a vclock in find if the KVS has updated to it so far
+	//this ideally should have a 500 error if 20 seconds have passed
 	if key.Version != nil {
 		for {
 			if check_version(key.Version) {
@@ -228,6 +234,8 @@ func handle_kvs_view(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+//gonna need this for finding right shard
+
 /*
 // passes the request upstream
 func pass_kvs(w http.ResponseWriter, r *http.Request) {
@@ -268,6 +276,7 @@ func create_kvs_view(w http.ResponseWriter, r *http.Request) {
 
 	_ = json.NewDecoder(r.Body).Decode(&viewList)
 	current.View = viewList.View
+	//find if you are in the view
 	for i := 0; i < len(current.View); i++ {
 		if current.View[i] == os.Getenv("ADDRESS") {
 			inView = true
@@ -275,6 +284,7 @@ func create_kvs_view(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	//find nodes that aren't in the view anymore
 	var delete []string
 	for _, item := range oldList {
 
@@ -283,6 +293,7 @@ func create_kvs_view(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	//delete nodes not in view
 	for _, item := range delete {
 		url := "http://" + item + "/kvs/admin/view"
 		r, _ := http.NewRequest("DELETE", url, nil)
@@ -327,6 +338,46 @@ func testEq(a, b []string) bool {
 	return true
 }
 
+// gossips about the view to other nodes
+func gossip_view(v []string) {
+	if !inView {
+		return
+	}
+
+	client := http.Client{
+		Timeout: time.Second * 1,
+	}
+
+	//should change this to just target a random node for less traffic
+	for i := 0; i < len(current.View); i += 1 {
+		if current.View[i] == os.Getenv("ADDRESS") {
+			continue
+		}
+		url := "http://" + current.View[i] + "/gossip/view"
+		view_marshalled, _ := json.Marshal(keys)
+		r, err := http.NewRequest("PUT", url, strings.NewReader(string(view_marshalled)))
+		if err != nil {
+			continue
+		}
+		r.Header.Add("Content-Type", "application/json")
+		client.Do(r)
+	}
+}
+
+// checks if views are the same, else set it
+func compare_view(w http.ResponseWriter, r *http.Request) {
+	var v []string
+	_ = json.NewDecoder(r.Body).Decode(&v)
+
+	//if the arrays are equal return
+	if testEq(v, current.View) {
+		return
+	}
+
+	//set it
+	current.View = v
+}
+
 // gossips to other nodes about what KVS it has
 func gossip_kvs(v []KVS) {
 	if !inView {
@@ -335,6 +386,8 @@ func gossip_kvs(v []KVS) {
 	client := http.Client{
 		Timeout: time.Second * 1,
 	}
+
+	//should change this to just target a random node for less traffic
 	for i := 0; i < len(current.View); i++ {
 		if current.View[i] == os.Getenv("ADDRESS") {
 			continue
@@ -370,10 +423,7 @@ func compare_kvs(w http.ResponseWriter, r *http.Request) {
 		mergedMap[key.Key] = key
 	}
 
-	//check if key is in the map
-	//change key.Value != p.Value
-	//to check version/vector clock
-	//add check for concurrency as well
+	//if key is not in the local kvs || local key is concurrent to sent key and sent key was written later || sent key is descendent of local key
 	for _, key := range keys {
 		if p, ok := mergedMap[key.Key]; !ok || (key.Version.Compare(p.Version, vclock.Concurrent) && key.Time.After(p.Time)) || key.Version.Compare(p.Version, vclock.Descendant) {
 			mergedMap[key.Key] = key
@@ -391,13 +441,15 @@ func compare_kvs(w http.ResponseWriter, r *http.Request) {
 
 // starts gossiping
 func start_gossip() {
+	//do this every second
 	interal := 1
 	ticker = *time.NewTicker(time.Duration(interal) * time.Second)
 
+	//sends info about view/KVS to the other nodes in the background
 	go func() {
 		for {
 			<-ticker.C
-			go test(keys)
+			go gossip_view(current.View)
 			go gossip_kvs(keys)
 			time.Sleep(time.Second * 1)
 		}
@@ -409,6 +461,7 @@ func main() {
 	inView = false
 
 	//if the program gets a FORWARDING_ADDRESS then it's a follower, else it's the main
+	router.HandleFunc("/gossip/view", compare_view).Methods("PUT")
 	router.HandleFunc("/gossip", compare_kvs).Methods("PUT")
 	router.HandleFunc("/kvs/admin/view", handle_kvs_view).Methods("GET", "PUT", "DELETE")
 	router.HandleFunc("/kvs/data/{key}", handle_kvs).Methods("GET", "PUT", "DELETE")
