@@ -16,6 +16,20 @@ import (
 var inView bool
 var ticker time.Ticker
 
+type NodeShards struct {
+	Shard int      `json:"shard_id"`
+	Node  []string `json:"nodes"`
+}
+
+type ShardsDisplay struct {
+	NodesList []NodeShards `json:"view"`
+}
+
+type Shards struct {
+	Shard int      `json:"num_shards"`
+	Nodes []string `json:"nodes"`
+}
+
 type Views struct {
 	View []string `json:"view"`
 }
@@ -28,8 +42,10 @@ type KVS struct {
 }
 
 var keys []KVS
-
-var current Views
+var display ShardsDisplay
+var current Shards
+var numShards int
+var selfID int
 
 // check if a version vclock is greater/equal to request
 func check_version(r vclock.VClock) bool {
@@ -263,51 +279,66 @@ func pass_kvs(w http.ResponseWriter, r *http.Request) {
 
 // returns the current view
 func get_kvs_view(w http.ResponseWriter, r *http.Request) {
-	w.WriteHeader(200)
+	var display []NodeShards
+
+	//loop based on number of shards
+	for i := 0; i < current.Shard; i++ {
+		var singularShard NodeShards
+		singularShard.Shard = i
+		nodeList := []string{}
+		display = append(display, (NodeShards{
+			Shard: i,
+			Node:  nodeList,
+		}))
+	}
+	for j := 0; j < len(current.Nodes); j++ {
+		shardID := j % current.Shard
+		display[shardID].Node = append(display[shardID].Node, current.Nodes[j])
+	}
+
 	json.NewEncoder(w).Encode(struct {
-		View []string `json:"view"`
-	}{current.View})
+		NodesList []NodeShards `json:"view"`
+	}{display})
+
+	w.WriteHeader(200)
+
 }
 
 // sets the node view
 func create_kvs_view(w http.ResponseWriter, r *http.Request) {
-	var viewList Views
-	oldList := current.View
+	var shardList Shards
+	oldList := current.Nodes
+	_ = json.NewDecoder(r.Body).Decode(&shardList)
+	current.Nodes = shardList.Nodes
+	current.Shard = shardList.Shard
 
-	_ = json.NewDecoder(r.Body).Decode(&viewList)
-	current.View = viewList.View
-	//find if you are in the view
-	for i := 0; i < len(current.View); i++ {
-		if current.View[i] == os.Getenv("ADDRESS") {
+	for i := 0; i < len(current.Nodes); i++ {
+		if current.Nodes[i] == os.Getenv("ADDRESS") {
+			fmt.Println("WE MATCHED")
+			selfID = i % current.Shard
 			inView = true
-			start_gossip()
 		}
 	}
-
-	//find nodes that aren't in the view anymore
 	var delete []string
 	for _, item := range oldList {
 
-		if !slices.Contains(current.View, item) {
+		if !slices.Contains(current.Nodes, item) {
 			delete = append(delete, item)
 		}
 	}
-
-	//delete nodes not in view
 	for _, item := range delete {
 		url := "http://" + item + "/kvs/admin/view"
 		r, _ := http.NewRequest("DELETE", url, nil)
 		http.DefaultClient.Do(r)
 	}
-
-	//pass_view()
+	w.WriteHeader(200)
 }
 
 // deletes the node view
 func delete_kvs_view(w http.ResponseWriter, r *http.Request) {
 	inView = false
 	keys = nil
-	current.View = current.View[:0]
+	current.Nodes = current.Nodes[:0]
 	ticker.Stop()
 	fmt.Println("STOPPED")
 	w.WriteHeader(200)
@@ -349,12 +380,12 @@ func gossip_view(v []string) {
 	}
 
 	//should change this to just target a random node for less traffic
-	for i := 0; i < len(current.View); i += 1 {
-		if current.View[i] == os.Getenv("ADDRESS") {
+	for i := 0; i < len(current.Nodes); i += 1 {
+		if current.Nodes[i] == os.Getenv("ADDRESS") {
 			continue
 		}
-		url := "http://" + current.View[i] + "/gossip/view"
-		view_marshalled, _ := json.Marshal(current.View)
+		url := "http://" + current.Nodes[i] + "/gossip/view"
+		view_marshalled, _ := json.Marshal(Shards{Shard: current.Shard, Nodes: current.Nodes})
 		r, err := http.NewRequest("PUT", url, strings.NewReader(string(view_marshalled)))
 		if err != nil {
 			continue
@@ -370,12 +401,12 @@ func compare_view(w http.ResponseWriter, r *http.Request) {
 	_ = json.NewDecoder(r.Body).Decode(&v)
 
 	//if the arrays are equal return
-	if testEq(v, current.View) {
+	if testEq(v, current.Nodes) {
 		return
 	}
 
 	//set it
-	current.View = v
+	current.Nodes = v
 }
 
 // gossips to other nodes about what KVS it has
@@ -388,11 +419,11 @@ func gossip_kvs(v []KVS) {
 	}
 
 	//should change this to just target a random node for less traffic
-	for i := 0; i < len(current.View); i++ {
-		if current.View[i] == os.Getenv("ADDRESS") {
+	for i := 0; i < len(current.Nodes); i++ {
+		if current.Nodes[i] == os.Getenv("ADDRESS") {
 			continue
 		}
-		url := "http://" + current.View[i] + "/gossip"
+		url := "http://" + current.Nodes[i] + "/gossip"
 		view_marshalled, _ := json.Marshal(keys)
 		r, err := http.NewRequest("PUT", url, strings.NewReader(string(view_marshalled)))
 		if err != nil {
@@ -449,7 +480,7 @@ func start_gossip() {
 	go func() {
 		for {
 			<-ticker.C
-			go gossip_view(current.View)
+			go gossip_view(current.Nodes)
 			go gossip_kvs(keys)
 			time.Sleep(time.Second * 1)
 		}
