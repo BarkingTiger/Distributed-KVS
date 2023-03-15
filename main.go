@@ -69,6 +69,7 @@ func get_kvs(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(418)
 		json.NewEncoder(w).Encode(map[string]string{"error": "uninitialized"})
+		return
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -104,69 +105,6 @@ func get_kvs(w http.ResponseWriter, r *http.Request) {
 
 	//not found
 	w.WriteHeader(404)
-	json.NewEncoder(w).Encode(struct {
-		Version vclock.VClock `json:"causal-metadata"`
-	}{key.Version})
-}
-
-// creates the kvs
-func create_kvs(w http.ResponseWriter, r *http.Request) {
-	if !inView {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(418)
-		json.NewEncoder(w).Encode(map[string]string{"error": "uninitialized"})
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-
-	//gets the JSON body
-	vars := mux.Vars(r)
-	k := vars["key"]
-	var key KVS
-	_ = json.NewDecoder(r.Body).Decode(&key)
-
-	if key.Version == nil {
-		key.Version = vclock.New()
-	}
-
-	//checks if JSON is malformed
-	if key.Key == "" {
-		w.WriteHeader(400)
-		json.NewEncoder(w).Encode(map[string]string{"error": "bad request"})
-		return
-	}
-
-	//check if key or value is longer than 200 characters
-	if len(k) > 2048 || len(key.Value) > 8000000 {
-		w.WriteHeader(400)
-		json.NewEncoder(w).Encode(map[string]string{"error": "key/val too large"})
-		return
-	}
-
-	//checks if it's in memory, if so replace it
-	for index, item := range keys {
-		if item.Key == k && item.Value != "" {
-			item.Value = key.Value
-			//increment clock
-			key.Version.Tick(os.Getenv("ADDRESS"))
-			key.Time = time.Now()
-			keys = append(keys[:index], keys[index+1:]...)
-			keys = append(keys, item)
-			w.WriteHeader(200)
-			json.NewEncoder(w).Encode(struct {
-				Version vclock.VClock `json:"causal-metadata"`
-			}{key.Version})
-			return
-		}
-	}
-
-	//if it's a new key
-	//make new clock and tick it
-	key.Key = k
-	key.Version.Tick(os.Getenv("ADDRESS"))
-	key.Time = time.Now()
-	keys = append(keys, key)
-	w.WriteHeader(201)
 	json.NewEncoder(w).Encode(struct {
 		Version vclock.VClock `json:"causal-metadata"`
 	}{key.Version})
@@ -281,29 +219,37 @@ func pass_kvs(w http.ResponseWriter, r *http.Request) {
 
 // returns the current view
 func get_kvs_view(w http.ResponseWriter, r *http.Request) {
-	var display []NodeShards
-
+	var getView []NodeShards
 	//loop based on number of shards
 	for i := 0; i < current.Shard; i++ {
 		var singularShard NodeShards
 		singularShard.Shard = i
 		nodeList := []string{}
-		display = append(display, (NodeShards{
+		getView = append(getView, (NodeShards{
 			Shard: i,
 			Node:  nodeList,
 		}))
 	}
 	for j := 0; j < len(current.Nodes); j++ {
 		shardID := j % current.Shard
-		display[shardID].Node = append(display[shardID].Node, current.Nodes[j])
+		getView[shardID].Node = append(getView[shardID].Node, current.Nodes[j])
 	}
 
 	json.NewEncoder(w).Encode(struct {
 		NodesList []NodeShards `json:"view"`
-	}{display})
+	}{getView})
 
 	w.WriteHeader(200)
 
+}
+
+func indexOf(e string, list []string) int {
+	for i, j := range list {
+		if e == j {
+			return i
+		}
+	}
+	return -1 //not found.
 }
 
 // sets the node view
@@ -316,11 +262,11 @@ func create_kvs_view(w http.ResponseWriter, r *http.Request) {
 
 	for i := 0; i < len(current.Nodes); i++ {
 		if current.Nodes[i] == os.Getenv("ADDRESS") {
-			fmt.Println("WE MATCHED")
-			selfID = i % current.Shard
 			inView = true
+			start_gossip()
 		}
 	}
+	selfID = indexOf(os.Getenv("ADDRESS"), current.Nodes) % current.Shard
 	var delete []string
 	for _, item := range oldList {
 
@@ -336,35 +282,31 @@ func create_kvs_view(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(200)
 }
 
+// checks if views are the same, else set it
+func compare_view(w http.ResponseWriter, r *http.Request) {
+	var v Shards
+	_ = json.NewDecoder(r.Body).Decode(&v)
+	inView = true
+	//if the arrays are equal return
+	if testEq(v.Nodes, current.Nodes) {
+		return
+	}
+
+	//set it
+	current.Nodes = v.Nodes
+	current.Shard = v.Shard
+	selfID = indexOf(os.Getenv("ADDRESS"), current.Nodes) % current.Shard
+}
+
 // deletes the node view
 func delete_kvs_view(w http.ResponseWriter, r *http.Request) {
 	inView = false
 	keys = nil
 	current.Nodes = current.Nodes[:0]
+	current.Shard = 0
 	ticker.Stop()
 	fmt.Println("STOPPED")
 	w.WriteHeader(200)
-}
-
-func hash(s string) uint64 {
-	hasher := fnv.New64a()
-	hasher.Write([]byte(s))
-	return hasher.Sum64()
-}
-
-func jump_hash(key int64, buckets int) int {
-	rand.Seed(key)
-	var tracker1 float64
-	var tracker2 float64
-	tracker1 = 1.0
-	tracker2 = 0.0
-	for tracker2 < float64(buckets) {
-		tracker1 = tracker2
-		tracker2 = ((tracker1 + 1) / rand.Float64())
-		fmt.Println("looping jump hash")
-		fmt.Println(tracker2)
-	}
-	return int(tracker1)
 }
 
 // for testing purposes this prints out the KVS
@@ -402,6 +344,8 @@ func gossip_kvs(v []KVS) {
 	}
 
 	//should change this to just target a random node for less traffic
+
+	//gossip the kvs
 	for i := 0; i < len(current.Nodes); i++ {
 		if current.Nodes[i] == os.Getenv("ADDRESS") {
 			continue
@@ -415,6 +359,79 @@ func gossip_kvs(v []KVS) {
 		r.Header.Add("Content-Type", "application/json")
 		client.Do(r)
 	}
+}
+
+// creates the kvs
+func create_kvs(w http.ResponseWriter, r *http.Request) {
+	if !inView {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(418)
+		json.NewEncoder(w).Encode(map[string]string{"error": "uninitialized"})
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+
+	//gets the JSON body
+	vars := mux.Vars(r)
+	k := vars["key"]
+	var key KVS
+	_ = json.NewDecoder(r.Body).Decode(&key)
+
+	if key.Version == nil {
+		key.Version = vclock.New()
+	}
+
+	//checks if JSON is malformed
+	if k == "" {
+		w.WriteHeader(400)
+		json.NewEncoder(w).Encode(map[string]string{"error": "bad request"})
+		return
+	}
+
+	//check if key or value is longer than 200 characters
+	if len(k) > 2048 || len(key.Value) > 8000000 {
+		w.WriteHeader(400)
+		json.NewEncoder(w).Encode(map[string]string{"error": "key/val too large"})
+		return
+	}
+
+	hashed_key := hash(k) //% uint64(current.Shard)
+	hash_key_64 := int64(hashed_key)
+	bucketNumber := jump_hash(hash_key_64, len(current.Nodes))
+	targetShard := bucketNumber % current.Shard
+	//if the selfID (which is the shard this process is in) is not
+	//equal to the target shard, we should just return.
+	if targetShard != selfID {
+		return
+	}
+
+	//checks if it's in memory, if so replace it
+	for index, item := range keys {
+		if item.Key == k && item.Value != "" {
+			item.Value = key.Value
+			//increment clock
+			key.Version.Tick(os.Getenv("ADDRESS"))
+			key.Time = time.Now()
+			keys = append(keys[:index], keys[index+1:]...)
+			keys = append(keys, item)
+			w.WriteHeader(200)
+			json.NewEncoder(w).Encode(struct {
+				Version vclock.VClock `json:"causal-metadata"`
+			}{key.Version})
+			return
+		}
+	}
+
+	//if it's a new key
+	//make new clock and tick it
+	key.Key = k
+	key.Version.Tick(os.Getenv("ADDRESS"))
+	key.Time = time.Now()
+	keys = append(keys, key)
+	w.WriteHeader(201)
+	json.NewEncoder(w).Encode(struct {
+		Version vclock.VClock `json:"causal-metadata"`
+	}{key.Version})
 }
 
 // compares the KVS and updates it accordingly
@@ -453,23 +470,6 @@ func compare_kvs(w http.ResponseWriter, r *http.Request) {
 	keys = mergedKeys
 }
 
-// checks if views are the same, else set it
-func compare_view(w http.ResponseWriter, r *http.Request) {
-	fmt.Println("1st CV")
-	var v Shards
-	_ = json.NewDecoder(r.Body).Decode(&v)
-
-	//if the arrays are equal return
-	if testEq(v.Nodes, current.Nodes) {
-		fmt.Println("2nd CV")
-		return
-	}
-
-	//set it
-	current.Nodes = v.Nodes
-	current.Shard = v.Shard
-}
-
 // gossips about the view to other nodes
 func gossip_view(v Shards) {
 	if !inView {
@@ -496,6 +496,58 @@ func gossip_view(v Shards) {
 	}
 }
 
+func hash(s string) uint64 {
+	hasher := fnv.New64a()
+	hasher.Write([]byte(s))
+	return hasher.Sum64()
+}
+
+func jump_hash(key int64, buckets int) int {
+	rand.Seed(key)
+	var tracker1 float64
+	var tracker2 float64
+	tracker1 = 1.0
+	tracker2 = 0.0
+	for tracker2 < float64(buckets) {
+		tracker1 = tracker2
+		tracker2 = ((tracker1 + 1) / rand.Float64())
+		fmt.Println("looping jump hash")
+		fmt.Println(tracker2)
+	}
+	return int(tracker1)
+}
+
+// currently doesn't really look at causal consistency yet;
+// but it can be used to make sure all the keys are in the right shards!
+func get_all_keys(w http.ResponseWriter, r *http.Request) {
+
+	var keyList []string
+	count := 0
+	var key KVS
+	_ = json.NewDecoder(r.Body).Decode(&key)
+
+	//metaData is the clock of the request
+	metaData := key.Version
+	if metaData == nil {
+		metaData = vclock.New()
+	}
+	metaData.Tick(os.Getenv("ADDRESS"))
+	for _, item := range keys {
+		keyList = append(keyList, item.Key)
+		count = count + 1
+	}
+
+	w.WriteHeader(200)
+
+	json.NewEncoder(w).Encode(struct {
+		Shard   int           `json:"shard_id"`
+		Count   int           `json:"count"`
+		Keys    []string      `json:"keys"`
+		Version vclock.VClock `json:"causal-metadata"`
+	}{selfID, count, keyList, metaData})
+
+}
+
 // starts gossiping
 func start_gossip() {
 	//do this every second
@@ -516,7 +568,7 @@ func start_gossip() {
 func main() {
 	router := mux.NewRouter()
 	inView = false
-	start_gossip()
+	router.HandleFunc("/kvs/data", get_all_keys).Methods("GET")
 	router.HandleFunc("/gossip/view", compare_view).Methods("PUT")
 	router.HandleFunc("/gossip", compare_kvs).Methods("PUT")
 	router.HandleFunc("/kvs/admin/view", handle_kvs_view).Methods("GET", "PUT", "DELETE")
