@@ -3,6 +3,8 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"hash/fnv"
+	"math/rand"
 	"net/http"
 	"os"
 	"strings"
@@ -344,6 +346,27 @@ func delete_kvs_view(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(200)
 }
 
+func hash(s string) uint64 {
+	hasher := fnv.New64a()
+	hasher.Write([]byte(s))
+	return hasher.Sum64()
+}
+
+func jump_hash(key int64, buckets int) int {
+	rand.Seed(key)
+	var tracker1 float64
+	var tracker2 float64
+	tracker1 = 1.0
+	tracker2 = 0.0
+	for tracker2 < float64(buckets) {
+		tracker1 = tracker2
+		tracker2 = ((tracker1 + 1) / rand.Float64())
+		fmt.Println("looping jump hash")
+		fmt.Println(tracker2)
+	}
+	return int(tracker1)
+}
+
 // for testing purposes this prints out the KVS
 func test(v []KVS) {
 	if !inView {
@@ -367,46 +390,6 @@ func testEq(a, b []string) bool {
 	}
 
 	return true
-}
-
-// gossips about the view to other nodes
-func gossip_view(v []string) {
-	if !inView {
-		return
-	}
-
-	client := http.Client{
-		Timeout: time.Second * 1,
-	}
-
-	//should change this to just target a random node for less traffic
-	for i := 0; i < len(current.Nodes); i += 1 {
-		if current.Nodes[i] == os.Getenv("ADDRESS") {
-			continue
-		}
-		url := "http://" + current.Nodes[i] + "/gossip/view"
-		view_marshalled, _ := json.Marshal(Shards{Shard: current.Shard, Nodes: current.Nodes})
-		r, err := http.NewRequest("PUT", url, strings.NewReader(string(view_marshalled)))
-		if err != nil {
-			continue
-		}
-		r.Header.Add("Content-Type", "application/json")
-		client.Do(r)
-	}
-}
-
-// checks if views are the same, else set it
-func compare_view(w http.ResponseWriter, r *http.Request) {
-	var v []string
-	_ = json.NewDecoder(r.Body).Decode(&v)
-
-	//if the arrays are equal return
-	if testEq(v, current.Nodes) {
-		return
-	}
-
-	//set it
-	current.Nodes = v
 }
 
 // gossips to other nodes about what KVS it has
@@ -470,6 +453,49 @@ func compare_kvs(w http.ResponseWriter, r *http.Request) {
 	keys = mergedKeys
 }
 
+// checks if views are the same, else set it
+func compare_view(w http.ResponseWriter, r *http.Request) {
+	fmt.Println("1st CV")
+	var v Shards
+	_ = json.NewDecoder(r.Body).Decode(&v)
+
+	//if the arrays are equal return
+	if testEq(v.Nodes, current.Nodes) {
+		fmt.Println("2nd CV")
+		return
+	}
+
+	//set it
+	current.Nodes = v.Nodes
+	current.Shard = v.Shard
+}
+
+// gossips about the view to other nodes
+func gossip_view(v Shards) {
+	if !inView {
+		return
+	}
+
+	client := http.Client{
+		Timeout: time.Second * 1,
+	}
+
+	//should change this to just target a random node for less traffic
+	for i := 0; i < len(current.Nodes); i += 1 {
+		if current.Nodes[i] == os.Getenv("ADDRESS") {
+			continue
+		}
+		url := "http://" + current.Nodes[i] + "/gossip/view"
+		view_marshalled, _ := json.Marshal(Shards{Shard: current.Shard, Nodes: current.Nodes})
+		r, err := http.NewRequest("PUT", url, strings.NewReader(string(view_marshalled)))
+		if err != nil {
+			continue
+		}
+		r.Header.Add("Content-Type", "application/json")
+		client.Do(r)
+	}
+}
+
 // starts gossiping
 func start_gossip() {
 	//do this every second
@@ -480,7 +506,7 @@ func start_gossip() {
 	go func() {
 		for {
 			<-ticker.C
-			go gossip_view(current.Nodes)
+			go gossip_view(current)
 			go gossip_kvs(keys)
 			time.Sleep(time.Second * 1)
 		}
@@ -490,8 +516,7 @@ func start_gossip() {
 func main() {
 	router := mux.NewRouter()
 	inView = false
-
-	//if the program gets a FORWARDING_ADDRESS then it's a follower, else it's the main
+	start_gossip()
 	router.HandleFunc("/gossip/view", compare_view).Methods("PUT")
 	router.HandleFunc("/gossip", compare_kvs).Methods("PUT")
 	router.HandleFunc("/kvs/admin/view", handle_kvs_view).Methods("GET", "PUT", "DELETE")
