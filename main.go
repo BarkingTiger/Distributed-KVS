@@ -314,7 +314,7 @@ func create_kvs_view(w http.ResponseWriter, r *http.Request) {
 	for i := 0; i < len(current.Nodes); i++ {
 		if current.Nodes[i] == os.Getenv("ADDRESS") {
 			inView = true
-			start_gossip()
+			//start_gossip()
 		}
 	}
 	selfID = indexOf(os.Getenv("ADDRESS"), current.Nodes) % current.Shard
@@ -339,18 +339,21 @@ func compare_view(w http.ResponseWriter, r *http.Request) {
 	_ = json.NewDecoder(r.Body).Decode(&v)
 	inView = true
 	//maybe add && number shards == 0
-	//if len(current.Nodes) == 0 {
-	//	current.Nodes = v.Nodes
-	//		current.Shard = v.Shard
-	//	}
+	if len(current.Nodes) == 0 {
+		current.Nodes = v.Nodes
+		current.Shard = v.Shard
+		selfID = indexOf(os.Getenv("ADDRESS"), current.Nodes) % current.Shard
+	}
 	//if the arrays are equal return
 	if testEq(v.Nodes, current.Nodes) && (v.Shard == current.Shard) {
+		//selfID = indexOf(os.Getenv("ADDRESS"), current.Nodes) % current.Shard
 		return
 	}
 
 	//set it
 	current.Nodes = v.Nodes
 	current.Shard = v.Shard
+	//determine what shard this address is in
 	selfID = indexOf(os.Getenv("ADDRESS"), current.Nodes) % current.Shard
 }
 
@@ -411,6 +414,7 @@ func gossip_kvs(v []KVS) {
 			view_marshalled, _ := json.Marshal(keys)
 			r, err := http.NewRequest("PUT", url, strings.NewReader(string(view_marshalled)))
 			if err != nil {
+				fmt.Println("ERROR IN GOSSIP KVS")
 				continue
 			}
 			r.Header.Add("Content-Type", "application/json")
@@ -426,6 +430,7 @@ func create_kvs(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(418)
 		json.NewEncoder(w).Encode(map[string]string{"error": "uninitialized"})
 	}
+	fmt.Println("we've entered create_kvs")
 
 	w.Header().Set("Content-Type", "application/json")
 
@@ -458,12 +463,10 @@ func create_kvs(w http.ResponseWriter, r *http.Request) {
 	bucketNumber := jump_hash(hash_key_64, len(current.Nodes))
 	targetShard := bucketNumber % current.Shard
 	fmt.Printf("target shard: %#v\n myShard: %#v\n", targetShard, selfID)
-	//if the selfID (which is the shard this process is in) is not
-	//equal to the target shard, we should just return.
 
-	//right now this is just sending to a specific bucket number,
+	//right now this is just sending to a specific bucket number (aka index on the address list),
 	//but we need to consider the case when this bucket is down.
-	//In that case, we should send it to another node that is in the same bucket!
+	//In that case, we should send it to another node that is in the same shard!
 	if targetShard != selfID {
 		w.WriteHeader(200)
 		json.NewEncoder(w).Encode(struct {
@@ -502,6 +505,7 @@ func create_kvs(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
+	fmt.Println("we've passed flag2")
 
 	//if it's a new key
 	//make new clock and tick it
@@ -520,7 +524,6 @@ func create_kvs(w http.ResponseWriter, r *http.Request) {
 func compare_kvs(w http.ResponseWriter, r *http.Request) {
 	var k []KVS
 	_ = json.NewDecoder(r.Body).Decode(&k)
-
 	//if current node KVS is empty
 	if len(keys) == 0 {
 		keys = k
@@ -594,8 +597,6 @@ func jump_hash(key int64, buckets int) int {
 	for tracker2 < float64(buckets) {
 		tracker1 = tracker2
 		tracker2 = ((tracker1 + 1) / rand.Float64())
-		fmt.Println("looping jump hash")
-		fmt.Println(tracker2)
 	}
 	return int(tracker1)
 }
@@ -644,6 +645,7 @@ func start_gossip() {
 func main() {
 	router := mux.NewRouter()
 	inView = false
+	start_gossip()
 	router.HandleFunc("/kvs/data", get_all_keys).Methods("GET")
 	router.HandleFunc("/gossip/view", compare_view).Methods("PUT")
 	router.HandleFunc("/gossip", compare_kvs).Methods("PUT")
