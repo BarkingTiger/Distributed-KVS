@@ -288,7 +288,7 @@ func compare_view(w http.ResponseWriter, r *http.Request) {
 	_ = json.NewDecoder(r.Body).Decode(&v)
 	inView = true
 	//if the arrays are equal return
-	if testEq(v.Nodes, current.Nodes) {
+	if testEq(v.Nodes, current.Nodes) && (v.Shard == current.Shard) {
 		return
 	}
 
@@ -350,14 +350,16 @@ func gossip_kvs(v []KVS) {
 		if current.Nodes[i] == os.Getenv("ADDRESS") {
 			continue
 		}
-		url := "http://" + current.Nodes[i] + "/gossip"
-		view_marshalled, _ := json.Marshal(keys)
-		r, err := http.NewRequest("PUT", url, strings.NewReader(string(view_marshalled)))
-		if err != nil {
-			continue
+		if i%current.Shard == selfID {
+			url := "http://" + current.Nodes[i] + "/gossip"
+			view_marshalled, _ := json.Marshal(keys)
+			r, err := http.NewRequest("PUT", url, strings.NewReader(string(view_marshalled)))
+			if err != nil {
+				continue
+			}
+			r.Header.Add("Content-Type", "application/json")
+			client.Do(r)
 		}
-		r.Header.Add("Content-Type", "application/json")
-		client.Do(r)
 	}
 }
 
@@ -399,9 +401,25 @@ func create_kvs(w http.ResponseWriter, r *http.Request) {
 	hash_key_64 := int64(hashed_key)
 	bucketNumber := jump_hash(hash_key_64, len(current.Nodes))
 	targetShard := bucketNumber % current.Shard
+	fmt.Printf("target shard: %#v\n myShard: %#v\n", targetShard, selfID)
 	//if the selfID (which is the shard this process is in) is not
 	//equal to the target shard, we should just return.
 	if targetShard != selfID {
+		w.WriteHeader(200)
+		json.NewEncoder(w).Encode(struct {
+			Version vclock.VClock `json:"causal-metadata"`
+		}{key.Version})
+		client := http.Client{
+			Timeout: time.Second * 1,
+		}
+		url := "http://" + current.Nodes[bucketNumber] + "/kvs/data/" + k
+		view_marshalled, _ := json.Marshal(key)
+		r, err := http.NewRequest("PUT", url, strings.NewReader(string(view_marshalled)))
+		if err != nil {
+			return
+		}
+		r.Header.Add("Content-Type", "application/json")
+		client.Do(r)
 		return
 	}
 
