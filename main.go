@@ -39,7 +39,8 @@ type Views struct {
 type KVS struct {
 	Key     string        `json:"key"`
 	Value   string        `json:"val"`
-	Version vclock.VClock `json:"causal-metadata"`
+	Vector  vclock.VClock `json:"causal-metadata"`
+	Version uint64        `json:"version"`
 	Time    time.Time     `json:"time"`
 }
 
@@ -54,13 +55,17 @@ func check_version(r vclock.VClock) bool {
 	//for all the keys, check if a local key is equal or a descendant of the request key
 	//idk if this works
 	for _, k := range keys {
-		//if so return true
-		if k.Version.Compare(r, vclock.Descendant|vclock.Equal) {
-			return true
+		//look if the key exists
+		version, found := r.FindTicks(k.Key)
+		if !found {
+			continue
+		}
+		if version < k.Version {
+			return false
 		}
 	}
 	//else false
-	return false
+	return true
 }
 
 // gets the kvs
@@ -82,15 +87,16 @@ func get_kvs(w http.ResponseWriter, r *http.Request) {
 
 	//if there's a vclock in find if the KVS has updated to it so far
 	//this ideally should have a 500 error if 20 seconds have passed
-	if key.Version != nil {
+	if key.Vector != nil {
 		for {
-			if check_version(key.Version) {
+			if check_version(key.Vector) {
 				break
 			}
 		}
 	}
 
 	//checks if it's in memory
+	//do we have to tick the vector for gets as well?
 	for _, item := range keys {
 		if item.Key == k && item.Value != "" {
 			value := item.Value
@@ -98,20 +104,60 @@ func get_kvs(w http.ResponseWriter, r *http.Request) {
 			json.NewEncoder(w).Encode(struct {
 				Value   string        `json:"val"`
 				Version vclock.VClock `json:"causal-metadata"`
-			}{value, item.Version})
+			}{value, item.Vector})
 			return
 		}
 	}
 
-	//not found
+	//not found, so check if other shards have it
+
+	//w.WriteHeader(200)
+	//json.NewEncoder(w).Encode(struct {
+	//	Version vclock.VClock `json:"causal-metadata"`
+	//}{key.Version})
+	//everytime we check a shard, we note it on the list below.
+	//After checking all shards, break out of the loop and conclude that none of the shards have the value!
+
+	/*
+		shardsChecked := []int{}
+		shardsChecked = append(shardsChecked, selfID)
+		for j := 0; j < len(current.Nodes); j++ {
+			if len(shardsChecked) == current.Shard {
+				break
+			}
+			client := http.Client{
+				Timeout: time.Second * 1,
+			}
+			if !slices.Contains(shardsChecked, j%current.Shard) {
+				url := "http://" + current.Nodes[j] + "/kvs/data/" + k
+				view_marshalled, _ := json.Marshal(key)
+				r, err := http.NewRequest("GET", url, strings.NewReader(string(view_marshalled)))
+				if err != nil {
+					return
+				}
+				r.Header.Add("Content-Type", "application/json")
+				client.Do(r)
+				shardsChecked = append(shardsChecked, j%current.Shard)
+				return
+			}
+
+		}
+	*/
+
 	w.WriteHeader(404)
 	json.NewEncoder(w).Encode(struct {
 		Version vclock.VClock `json:"causal-metadata"`
-	}{key.Version})
+	}{key.Vector})
 }
 
 // deletes the kvs
 func delete_kvs(w http.ResponseWriter, r *http.Request) {
+	if !inView {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(418)
+		json.NewEncoder(w).Encode(map[string]string{"error": "uninitialized"})
+		return
+	}
 	w.Header().Set("Content-Type", "application/json")
 
 	//gets the JSON body
@@ -124,15 +170,16 @@ func delete_kvs(w http.ResponseWriter, r *http.Request) {
 	for index, item := range keys {
 		if item.Key == k && item.Value != "" {
 			item.Value = ""
+			item.Version += 1
 			//increment clock
-			key.Version.Tick(os.Getenv("ADDRESS"))
+			key.Vector.Tick(item.Key)
 			key.Time = time.Now()
 			keys = append(keys[:index], keys[index+1:]...)
 			keys = append(keys, item)
 			w.WriteHeader(200)
 			json.NewEncoder(w).Encode(struct {
 				Version vclock.VClock `json:"causal-metadata"`
-			}{key.Version})
+			}{item.Vector})
 			return
 		}
 	}
@@ -260,6 +307,10 @@ func create_kvs_view(w http.ResponseWriter, r *http.Request) {
 	current.Nodes = shardList.Nodes
 	current.Shard = shardList.Shard
 
+	if testEq(oldList, current.Nodes) {
+		return
+	}
+
 	for i := 0; i < len(current.Nodes); i++ {
 		if current.Nodes[i] == os.Getenv("ADDRESS") {
 			inView = true
@@ -287,6 +338,11 @@ func compare_view(w http.ResponseWriter, r *http.Request) {
 	var v Shards
 	_ = json.NewDecoder(r.Body).Decode(&v)
 	inView = true
+	//maybe add && number shards == 0
+	//if len(current.Nodes) == 0 {
+	//	current.Nodes = v.Nodes
+	//		current.Shard = v.Shard
+	//	}
 	//if the arrays are equal return
 	if testEq(v.Nodes, current.Nodes) && (v.Shard == current.Shard) {
 		return
@@ -379,8 +435,8 @@ func create_kvs(w http.ResponseWriter, r *http.Request) {
 	var key KVS
 	_ = json.NewDecoder(r.Body).Decode(&key)
 
-	if key.Version == nil {
-		key.Version = vclock.New()
+	if key.Vector == nil {
+		key.Vector = vclock.New()
 	}
 
 	//checks if JSON is malformed
@@ -404,15 +460,21 @@ func create_kvs(w http.ResponseWriter, r *http.Request) {
 	fmt.Printf("target shard: %#v\n myShard: %#v\n", targetShard, selfID)
 	//if the selfID (which is the shard this process is in) is not
 	//equal to the target shard, we should just return.
+
+	//right now this is just sending to a specific bucket number,
+	//but we need to consider the case when this bucket is down.
+	//In that case, we should send it to another node that is in the same bucket!
 	if targetShard != selfID {
 		w.WriteHeader(200)
 		json.NewEncoder(w).Encode(struct {
 			Version vclock.VClock `json:"causal-metadata"`
-		}{key.Version})
+		}{key.Vector})
+		//also including version?
 		client := http.Client{
 			Timeout: time.Second * 1,
 		}
 		url := "http://" + current.Nodes[bucketNumber] + "/kvs/data/" + k
+
 		view_marshalled, _ := json.Marshal(key)
 		r, err := http.NewRequest("PUT", url, strings.NewReader(string(view_marshalled)))
 		if err != nil {
@@ -427,15 +489,16 @@ func create_kvs(w http.ResponseWriter, r *http.Request) {
 	for index, item := range keys {
 		if item.Key == k && item.Value != "" {
 			item.Value = key.Value
+			item.Version += 1
 			//increment clock
-			key.Version.Tick(os.Getenv("ADDRESS"))
+			item.Vector.Tick(item.Key)
 			key.Time = time.Now()
 			keys = append(keys[:index], keys[index+1:]...)
 			keys = append(keys, item)
 			w.WriteHeader(200)
 			json.NewEncoder(w).Encode(struct {
 				Version vclock.VClock `json:"causal-metadata"`
-			}{key.Version})
+			}{item.Vector})
 			return
 		}
 	}
@@ -443,13 +506,14 @@ func create_kvs(w http.ResponseWriter, r *http.Request) {
 	//if it's a new key
 	//make new clock and tick it
 	key.Key = k
-	key.Version.Tick(os.Getenv("ADDRESS"))
+	key.Vector.Tick(key.Key)
+	key.Version = 1
 	key.Time = time.Now()
 	keys = append(keys, key)
 	w.WriteHeader(201)
 	json.NewEncoder(w).Encode(struct {
 		Version vclock.VClock `json:"causal-metadata"`
-	}{key.Version})
+	}{key.Vector})
 }
 
 // compares the KVS and updates it accordingly
@@ -474,7 +538,7 @@ func compare_kvs(w http.ResponseWriter, r *http.Request) {
 
 	//if key is not in the local kvs || local key is concurrent to sent key and sent key was written later || sent key is descendent of local key
 	for _, key := range keys {
-		if p, ok := mergedMap[key.Key]; !ok || (key.Version.Compare(p.Version, vclock.Concurrent) && key.Time.After(p.Time)) || key.Version.Compare(p.Version, vclock.Descendant) {
+		if p, ok := mergedMap[key.Key]; !ok || (p.Version == key.Version && key.Vector.Compare(p.Vector, vclock.Concurrent) && key.Time.After(p.Time)) || key.Version > p.Version {
 			mergedMap[key.Key] = key
 		}
 	}
@@ -505,6 +569,7 @@ func gossip_view(v Shards) {
 		}
 		url := "http://" + current.Nodes[i] + "/gossip/view"
 		view_marshalled, _ := json.Marshal(Shards{Shard: current.Shard, Nodes: current.Nodes})
+		//r, err := http.NewRequest("PUT", url, bytes.NewBuffer(jsonData)) ------------
 		r, err := http.NewRequest("PUT", url, strings.NewReader(string(view_marshalled)))
 		if err != nil {
 			continue
@@ -541,28 +606,21 @@ func get_all_keys(w http.ResponseWriter, r *http.Request) {
 
 	var keyList []string
 	count := 0
-	var key KVS
-	_ = json.NewDecoder(r.Body).Decode(&key)
-
-	//metaData is the clock of the request
-	metaData := key.Version
-	if metaData == nil {
-		metaData = vclock.New()
-	}
-	metaData.Tick(os.Getenv("ADDRESS"))
+	vectorCombined := vclock.New()
 	for _, item := range keys {
 		keyList = append(keyList, item.Key)
+		vectorCombined.Merge(item.Vector)
+		//increment vector here for reads if needed
 		count = count + 1
 	}
 
 	w.WriteHeader(200)
-
 	json.NewEncoder(w).Encode(struct {
 		Shard   int           `json:"shard_id"`
 		Count   int           `json:"count"`
 		Keys    []string      `json:"keys"`
 		Version vclock.VClock `json:"causal-metadata"`
-	}{selfID, count, keyList, metaData})
+	}{selfID, count, keyList, vectorCombined})
 
 }
 
