@@ -18,20 +18,27 @@ import (
 var inView bool
 var ticker time.Ticker
 
+// This NodeShards shows which nodes are in which shard.
+// Mostly used in the getView function
 type NodeShards struct {
 	Shard int      `json:"shard_id"`
 	Node  []string `json:"nodes"`
 }
 
+// A slice that contains all of the shards
+// and the nodes in each shard.
 type ShardsDisplay struct {
 	NodesList []NodeShards `json:"view"`
 }
 
+// tracks how many shards there are, and the nodes in the view.
+// This will basically be our "view" struct from the last assignment
 type Shards struct {
 	Shard int      `json:"num_shards"`
 	Nodes []string `json:"nodes"`
 }
 
+// probably dont need this anymore
 type Views struct {
 	View []string `json:"view"`
 }
@@ -169,10 +176,11 @@ func delete_kvs(w http.ResponseWriter, r *http.Request) {
 	//checks if it's in memory, if so delete it
 	for index, item := range keys {
 		if item.Key == k && item.Value != "" {
+			//ticker.Stop()
 			item.Value = ""
 			item.Version += 1
 			//increment clock
-			key.Vector.Tick(item.Key)
+			item.Vector.Tick(item.Key)
 			key.Time = time.Now()
 			keys = append(keys[:index], keys[index+1:]...)
 			keys = append(keys, item)
@@ -268,6 +276,8 @@ func pass_kvs(w http.ResponseWriter, r *http.Request) {
 func get_kvs_view(w http.ResponseWriter, r *http.Request) {
 	var getView []NodeShards
 	//loop based on number of shards
+	//This whole for loop basically makes a struct of the form:
+	//{shard_id: i, nodes = [empty node list]}
 	for i := 0; i < current.Shard; i++ {
 		var singularShard NodeShards
 		singularShard.Shard = i
@@ -277,6 +287,8 @@ func get_kvs_view(w http.ResponseWriter, r *http.Request) {
 			Node:  nodeList,
 		}))
 	}
+	//this for loop actually appends onto the [empty node list] that we
+	//made in the previous for loop
 	for j := 0; j < len(current.Nodes); j++ {
 		shardID := j % current.Shard
 		getView[shardID].Node = append(getView[shardID].Node, current.Nodes[j])
@@ -290,6 +302,7 @@ func get_kvs_view(w http.ResponseWriter, r *http.Request) {
 
 }
 
+// used later for determining which shard the address is in
 func indexOf(e string, list []string) int {
 	for i, j := range list {
 		if e == j {
@@ -338,7 +351,7 @@ func compare_view(w http.ResponseWriter, r *http.Request) {
 	var v Shards
 	_ = json.NewDecoder(r.Body).Decode(&v)
 	inView = true
-	//maybe add && number shards == 0
+	//maybe add || number shards == 0
 	if len(current.Nodes) == 0 {
 		current.Nodes = v.Nodes
 		current.Shard = v.Shard
@@ -409,6 +422,7 @@ func gossip_kvs(v []KVS) {
 		if current.Nodes[i] == os.Getenv("ADDRESS") {
 			continue
 		}
+		//only gossip to other nodes in the same shard as you
 		if i%current.Shard == selfID {
 			url := "http://" + current.Nodes[i] + "/gossip"
 			view_marshalled, _ := json.Marshal(keys)
@@ -461,12 +475,13 @@ func create_kvs(w http.ResponseWriter, r *http.Request) {
 	hashed_key := hash(k) //% uint64(current.Shard)
 	hash_key_64 := int64(hashed_key)
 	bucketNumber := jump_hash(hash_key_64, len(current.Nodes))
+	//the bucket number will choose one of the addresses,
+	//and we can get the shard of this address.
 	targetShard := bucketNumber % current.Shard
 	fmt.Printf("target shard: %#v\n myShard: %#v\n", targetShard, selfID)
 
-	//right now this is just sending to a specific bucket number (aka index on the address list),
-	//but we need to consider the case when this bucket is down.
-	//In that case, we should send it to another node that is in the same shard!
+	//if this current node is not in the same shard as the designated bucket,
+	//then proxy the request to a node that is in the same shard as the bucket.
 	if targetShard != selfID {
 		w.WriteHeader(200)
 		json.NewEncoder(w).Encode(struct {
@@ -487,6 +502,10 @@ func create_kvs(w http.ResponseWriter, r *http.Request) {
 		client.Do(r)
 		return
 	}
+
+	//right now this is just sending to a specific bucket number (aka index on the address list),
+	//but we need to consider the case when this bucket is down.
+	//In that case, we should send it to another node that is in the same shard as the bucket!
 
 	//checks if it's in memory, if so replace it
 	for index, item := range keys {
@@ -514,7 +533,7 @@ func create_kvs(w http.ResponseWriter, r *http.Request) {
 	key.Version = 1
 	key.Time = time.Now()
 	keys = append(keys, key)
-	w.WriteHeader(201)
+	w.WriteHeader(200)
 	json.NewEncoder(w).Encode(struct {
 		Version vclock.VClock `json:"causal-metadata"`
 	}{key.Vector})
