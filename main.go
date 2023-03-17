@@ -21,7 +21,7 @@ import (
 var inView bool
 var ticker time.Ticker
 
-// This NodeShards shows which nodes are in which shard.
+// This NodeShards shows which nodes are in which INDIVIDUAL shard.
 // Mostly used in the getView function
 type NodeShards struct {
 	Shard int      `json:"shard_id"`
@@ -59,6 +59,7 @@ var display ShardsDisplay
 var current Shards
 var numShards int
 var selfID int
+var getView []NodeShards
 
 // check if a version vclock is greater/equal to request
 func check_version(r vclock.VClock) bool {
@@ -97,6 +98,8 @@ func get_kvs(w http.ResponseWriter, r *http.Request) {
 
 	//if there's a vclock in find if the KVS has updated to it so far
 	//this ideally should have a 500 error if 20 seconds have passed
+
+	/*
 	if key.Vector != nil {
 		for {
 			if check_version(key.Vector) {
@@ -104,6 +107,7 @@ func get_kvs(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
+	*/
 
 	//checks if it's in memory
 	//do we have to tick the vector for gets as well?
@@ -118,41 +122,63 @@ func get_kvs(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
+	hashed_key := hash(k) //% uint64(current.Shard)
+	hash_key_64 := int64(hashed_key)
+	bucketNumber := jump_hash(hash_key_64, len(current.Nodes))
+	//the bucket number will choose one of the addresses,
+	//and we can get the shard of this address.
+	targetShard := bucketNumber % current.Shard
+	fmt.Printf("target shard: %#v\n myShard: %#v\n", targetShard, selfID)
+	set_shardView()
 
-	//not found, so check if other shards have it
+	designatedIndex := 0
 
-	//w.WriteHeader(200)
-	//json.NewEncoder(w).Encode(struct {
-	//	Version vclock.VClock `json:"causal-metadata"`
-	//}{key.Version})
-	//everytime we check a shard, we note it on the list below.
-	//After checking all shards, break out of the loop and conclude that none of the shards have the value!
-
-	/*
-		shardsChecked := []int{}
-		shardsChecked = append(shardsChecked, selfID)
-		for j := 0; j < len(current.Nodes); j++ {
-			if len(shardsChecked) == current.Shard {
-				break
-			}
-			client := http.Client{
-				Timeout: time.Second * 1,
-			}
-			if !slices.Contains(shardsChecked, j%current.Shard) {
-				url := "http://" + current.Nodes[j] + "/kvs/data/" + k
-				view_marshalled, _ := json.Marshal(key)
-				r, err := http.NewRequest("GET", url, strings.NewReader(string(view_marshalled)))
-				if err != nil {
-					return
-				}
-				r.Header.Add("Content-Type", "application/json")
-				client.Do(r)
-				shardsChecked = append(shardsChecked, j%current.Shard)
-				return
-			}
-
+	for j := 0; j < len(getView); j++ {
+		if getView[j].Shard == targetShard{
+			designatedIndex = j
 		}
-	*/
+	}
+
+	errorFlag := true
+	for _, eachAddress := range getView[designatedIndex].Node {
+		timeOutFlag := false
+		ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+		defer cancel()
+		r = r.WithContext(ctx)
+		fmt.Println("HERE: http://" + eachAddress + "/kvs/data/" + k)
+		//get url from environment variable FORWARDING_ADDRESS
+		//add http:// into it or else it won't work
+		url, _ := url.Parse("http://" + eachAddress)// + "/kvs/data/" + k)
+		view_marshalled, _ := json.Marshal(key)
+		r, _ := http.NewRequest("GET", "http://" + eachAddress + "/kvs/data/" + k, strings.NewReader(string(view_marshalled)))
+		//error message on timeout
+		proxy := httputil.NewSingleHostReverseProxy(url)
+		proxy.ErrorHandler = func(w http.ResponseWriter, r *http.Request, err error) {
+			//on timeout, go to next address in the shard
+			fmt.Println("it's an error!!!!!")
+			timeOutFlag = true
+		}
+		if timeOutFlag {
+			break
+		}
+	
+		//send upstream
+		r.Header.Add("Content-Type", "application/json")
+		fmt.Println("http://" + eachAddress + "/kvs/data/" + k)
+		proxy.ServeHTTP(w, r)
+		errorFlag = false
+		break
+	}
+	if errorFlag {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(503)
+		json.NewEncoder(w).Encode(struct {
+			Error string `json:"error"`
+			Upstream NodeShards `json:"upstream"`
+		}{"upstream down", getView[designatedIndex]})
+		return
+	}
+	fmt.Printf("ERRORFLAG: %v\n", (errorFlag))
 
 	w.WriteHeader(404)
 	json.NewEncoder(w).Encode(struct {
@@ -248,39 +274,9 @@ func handle_kvs_view(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-//gonna need this for finding right shard
 
-/*
-// passes the request upstream
-func pass_kvs(w http.ResponseWriter, r *http.Request) {
-	//makes sure it's done in 10 seconds or it will timeout
-	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
-	defer cancel()
-	r = r.WithContext(ctx)
-
-	//get url from environment variable FORWARDING_ADDRESS
-	//add http:// into it or else it won't work
-	url, _ := url.Parse("http://" + os.Getenv("FORWARDING_ADDRESS"))
-	proxy := httputil.NewSingleHostReverseProxy(url)
-
-	//error message on timeout
-	proxy.ErrorHandler = func(w http.ResponseWriter, r *http.Request, err error) {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(503)
-		json.NewEncoder(w).Encode(map[string]string{"error": "upstream down", "upstream": os.Getenv("FORWARDING_ADDRESS")})
-	}
-
-	//send upstream
-	proxy.ServeHTTP(w, r)
-}
-*/
-
-// returns the current view
-func get_kvs_view(w http.ResponseWriter, r *http.Request) {
-	var getView []NodeShards
-	//loop based on number of shards
-	//This whole for loop basically makes a struct of the form:
-	//{shard_id: i, nodes = [empty node list]}
+func set_shardView() {
+	getView = getView[:0]
 	for i := 0; i < current.Shard; i++ {
 		var singularShard NodeShards
 		singularShard.Shard = i
@@ -296,7 +292,15 @@ func get_kvs_view(w http.ResponseWriter, r *http.Request) {
 		shardID := j % current.Shard
 		getView[shardID].Node = append(getView[shardID].Node, current.Nodes[j])
 	}
+}
 
+// returns the current view
+func get_kvs_view(w http.ResponseWriter, r *http.Request) {
+	//loop based on number of shards
+	//This whole for loop basically makes a struct of the form:
+	//{shard_id: i, nodes = [empty node list]}
+
+	//set_shardView()
 	json.NewEncoder(w).Encode(struct {
 		NodesList []NodeShards `json:"view"`
 	}{getView})
@@ -346,6 +350,20 @@ func create_kvs_view(w http.ResponseWriter, r *http.Request) {
 		r, _ := http.NewRequest("DELETE", url, nil)
 		http.DefaultClient.Do(r)
 	}
+	set_shardView()
+	/*
+	for index, item := range keys {
+		if item.Value != ""{
+			hashed_key := hash(item.Key)
+			hash_key_64 := int64(hashed_key)
+			bucketNumber := jump_hash(hash_key_64, len(current.Nodes))
+			targetShard := bucketNumber % current.Shard
+			if targetShard != selfID {
+				keys = append(keys[:index], keys[index+1:]...)
+			}
+		}
+	}
+	*/
 	w.WriteHeader(200)
 }
 
@@ -358,7 +376,9 @@ func compare_view(w http.ResponseWriter, r *http.Request) {
 	if len(current.Nodes) == 0 {
 		current.Nodes = v.Nodes
 		current.Shard = v.Shard
+		set_shardView()
 		selfID = indexOf(os.Getenv("ADDRESS"), current.Nodes) % current.Shard
+		return
 	}
 	//if the arrays are equal return
 	if testEq(v.Nodes, current.Nodes) && (v.Shard == current.Shard) {
@@ -370,7 +390,23 @@ func compare_view(w http.ResponseWriter, r *http.Request) {
 	current.Nodes = v.Nodes
 	current.Shard = v.Shard
 	//determine what shard this address is in
+	set_shardView()
 	selfID = indexOf(os.Getenv("ADDRESS"), current.Nodes) % current.Shard
+	//delete the key off the shard if it's not there after the REsharding
+	/*
+	for index, item := range keys {
+		if item.Value != ""{
+			hashed_key := hash(item.Key)
+			hash_key_64 := int64(hashed_key)
+			bucketNumber := jump_hash(hash_key_64, len(current.Nodes))
+			targetShard := bucketNumber % current.Shard
+			if targetShard != selfID {
+				fmt.Println("GET OUT")
+				keys = append(keys[:index], keys[index+1:]...)
+			}
+		}
+	}
+	*/
 }
 
 // deletes the node view
@@ -478,56 +514,72 @@ func create_kvs(w http.ResponseWriter, r *http.Request) {
 	hashed_key := hash(k) //% uint64(current.Shard)
 	hash_key_64 := int64(hashed_key)
 	bucketNumber := jump_hash(hash_key_64, len(current.Nodes))
-	//the bucket number will choose one of the addresses,
-	//and we can get the shard of this address.
 	targetShard := bucketNumber % current.Shard
 	fmt.Printf("target shard: %#v\n myShard: %#v\n", targetShard, selfID)
-
+	set_shardView()
 	//if this current node is not in the same shard as the designated bucket,
 	//then proxy the request to a node that is in the same shard as the bucket.
+
+	//designatedIndex refers to the index within our getView that has the shard.
+	designatedIndex := 0
+
+	for j := 0; j < len(getView); j++ {
+		if getView[j].Shard == targetShard{
+			designatedIndex = j
+		}
+	}
+	/*
+	for index, shardView := range getView {
+		if shardView.Shard == targetShard {
+			designatedIndex = index
+		}
+	}
+	*/
+	fmt.Printf("GETVIEW: %v\n", (getView))
+	fmt.Printf("INDEX: %v\n", (designatedIndex))
+	fmt.Printf("VIEW: %v\n", getView[designatedIndex].Node)
 	if targetShard != selfID {
-		ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
-		defer cancel()
-		r = r.WithContext(ctx)
-	
-		//get url from environment variable FORWARDING_ADDRESS
-		//add http:// into it or else it won't work
-		url, _ := url.Parse("http://" + current.Nodes[bucketNumber])// + "/kvs/data/" + k)
-		view_marshalled, _ := json.Marshal(key)
-		r, _ := http.NewRequest("PUT", "http://" + current.Nodes[bucketNumber] + "/kvs/data/" + k, strings.NewReader(string(view_marshalled)))
-		//error message on timeout
-		proxy := httputil.NewSingleHostReverseProxy(url)
-		proxy.ErrorHandler = func(w http.ResponseWriter, r *http.Request, err error) {
+		errorFlag := true
+		for _, eachAddress := range getView[designatedIndex].Node {
+			timeOutFlag := false
+			ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+			defer cancel()
+			r = r.WithContext(ctx)
+			fmt.Println("HERE: http://" + eachAddress + "/kvs/data/" + k)
+			//get url from environment variable FORWARDING_ADDRESS
+			//add http:// into it or else it won't work
+			url, _ := url.Parse("http://" + eachAddress)// + "/kvs/data/" + k)
+			view_marshalled, _ := json.Marshal(key)
+			r, _ := http.NewRequest("PUT", "http://" + eachAddress + "/kvs/data/" + k, strings.NewReader(string(view_marshalled)))
+			//error message on timeout
+			proxy := httputil.NewSingleHostReverseProxy(url)
+			proxy.ErrorHandler = func(w http.ResponseWriter, r *http.Request, err error) {
+				//on timeout, go to next address in the shard
+				fmt.Println("it's an error!!!!!")
+				timeOutFlag = true
+			}
+			if timeOutFlag {
+				break
+			}
+		
+			//send upstream
+			r.Header.Add("Content-Type", "application/json")
+			fmt.Println("http://" + eachAddress + "/kvs/data/" + k)
+			proxy.ServeHTTP(w, r)
+			errorFlag = false
+			break
+		}
+		if errorFlag {
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(503)
-			json.NewEncoder(w).Encode(map[string]string{"error": "upstream down", "upstream": current.Nodes[bucketNumber]})
-			fmt.Println(err)
-		}
-	
-		//send upstream
-		r.Header.Add("Content-Type", "application/json")
-		fmt.Println("http://" + current.Nodes[bucketNumber] + "/kvs/data/" + k)
-		proxy.ServeHTTP(w, r)
-		/*
-		w.WriteHeader(200)
-		json.NewEncoder(w).Encode(struct {
-			Version vclock.VClock `json:"causal-metadata"`
-		}{key.Vector})
-		//also including version?
-		client := http.Client{
-			Timeout: time.Second * 1,
-		}
-		url := "http://" + current.Nodes[bucketNumber] + "/kvs/data/" + k
-
-		view_marshalled, _ := json.Marshal(key)
-		r, err := http.NewRequest("PUT", url, strings.NewReader(string(view_marshalled)))
-		if err != nil {
+			json.NewEncoder(w).Encode(struct {
+				Error string `json:"error"`
+				Upstream NodeShards `json:"upstream"`
+			}{"upstream down", getView[designatedIndex]})
 			return
 		}
-		r.Header.Add("Content-Type", "application/json")
-		client.Do(r)
+		fmt.Printf("ERRORFLAG: %v\n", (errorFlag))
 		return
-		*/
 	}
 
 	//right now this is just sending to a specific bucket number (aka index on the address list),
