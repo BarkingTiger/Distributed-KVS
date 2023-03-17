@@ -9,6 +9,9 @@ import (
 	"os"
 	"strings"
 	"time"
+	"context"
+	"net/url"
+	"net/http/httputil"
 
 	"git.tu-berlin.de/mcc-fred/vclock"
 	"github.com/gorilla/mux"
@@ -483,6 +486,29 @@ func create_kvs(w http.ResponseWriter, r *http.Request) {
 	//if this current node is not in the same shard as the designated bucket,
 	//then proxy the request to a node that is in the same shard as the bucket.
 	if targetShard != selfID {
+		ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+		defer cancel()
+		r = r.WithContext(ctx)
+	
+		//get url from environment variable FORWARDING_ADDRESS
+		//add http:// into it or else it won't work
+		url, _ := url.Parse("http://" + current.Nodes[bucketNumber])// + "/kvs/data/" + k)
+		view_marshalled, _ := json.Marshal(key)
+		r, _ := http.NewRequest("PUT", "http://" + current.Nodes[bucketNumber] + "/kvs/data/" + k, strings.NewReader(string(view_marshalled)))
+		//error message on timeout
+		proxy := httputil.NewSingleHostReverseProxy(url)
+		proxy.ErrorHandler = func(w http.ResponseWriter, r *http.Request, err error) {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(503)
+			json.NewEncoder(w).Encode(map[string]string{"error": "upstream down", "upstream": current.Nodes[bucketNumber]})
+			fmt.Println(err)
+		}
+	
+		//send upstream
+		r.Header.Add("Content-Type", "application/json")
+		fmt.Println("http://" + current.Nodes[bucketNumber] + "/kvs/data/" + k)
+		proxy.ServeHTTP(w, r)
+		/*
 		w.WriteHeader(200)
 		json.NewEncoder(w).Encode(struct {
 			Version vclock.VClock `json:"causal-metadata"`
@@ -501,6 +527,7 @@ func create_kvs(w http.ResponseWriter, r *http.Request) {
 		r.Header.Add("Content-Type", "application/json")
 		client.Do(r)
 		return
+		*/
 	}
 
 	//right now this is just sending to a specific bucket number (aka index on the address list),
@@ -628,10 +655,14 @@ func get_all_keys(w http.ResponseWriter, r *http.Request) {
 	count := 0
 	vectorCombined := vclock.New()
 	for _, item := range keys {
-		keyList = append(keyList, item.Key)
+		if item.Value != "" {
+			keyList = append(keyList, item.Key)
+			count = count + 1
+		}
+		//are we including the causal metadata of deleted keys?
 		vectorCombined.Merge(item.Vector)
 		//increment vector here for reads if needed
-		count = count + 1
+
 	}
 
 	w.WriteHeader(200)
