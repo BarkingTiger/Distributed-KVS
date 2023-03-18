@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"hash/fnv"
 	"math/rand"
 	"net/http"
@@ -387,8 +388,6 @@ func create_kvs_view(w http.ResponseWriter, r *http.Request) {
 			//start_gossip()
 		}
 	}
-	selfID = indexOf(os.Getenv("ADDRESS"), current.Nodes) % current.Shard
-	set_shardView()
 	var delete []string
 	for _, item := range oldList {
 
@@ -401,17 +400,119 @@ func create_kvs_view(w http.ResponseWriter, r *http.Request) {
 		r, _ := http.NewRequest("DELETE", url, nil)
 		http.DefaultClient.Do(r)
 	}
-	for index, item := range keys {
-		if item.Value != "" {
-			hashed_key := hash(item.Key)
-			hash_key_64 := int64(hashed_key)
-			bucketNumber := jump_hash(hash_key_64, len(current.Nodes))
-			targetShard := bucketNumber % current.Shard
-			if targetShard != selfID {
-				keys = append(keys[:index], keys[index+1:]...)
-			}
+	selfID = indexOf(os.Getenv("ADDRESS"), current.Nodes) % current.Shard
+	set_shardView()
+	k := make(map[int]KVS)
+	for i := 0; i < len(keys); i++ {
+		//if item.Value != "" {
+		hashed_key := hash(keys[i].Key)
+		hash_key_64 := int64(hashed_key)
+		bucketNumber := jump_hash(hash_key_64, len(current.Nodes))
+		targetShard := bucketNumber % current.Shard
+		if targetShard != selfID {
+			//fmt.Println("GET OUT")
+			//if index == len(keys)-1 {
+			//
+			//
+			go func(k KVS) {
+				client := http.Client{
+					Timeout: time.Second * 1,
+				}
+
+				for {
+					url := "http://" + current.Nodes[targetShard] + "/putNo"
+					view_marshalled, _ := json.Marshal(k)
+					r, err := http.NewRequest("PUT", url, strings.NewReader(string(view_marshalled)))
+					if err != nil {
+						//fmt.Println("ERROR IN GOSSIP KVS")
+						continue
+					}
+					r.Header.Add("Content-Type", "application/json")
+					resp, _ := client.Do(r)
+					if resp.StatusCode == 200 {
+						break
+					}
+				}
+			}(keys[i])
+			//
+			//
+			k[targetShard] = keys[i]
+			fmt.Printf("%v\n", keys[i])
+			//}
+			keys = append(keys[:i], keys[i+1:]...)
+			i--
+
 		}
+		//}
+
 	}
+
+	for i := 0; i < current.Shard-1; i += 1 {
+		if i == selfID {
+			continue
+		}
+		/*
+			go func(k map[int]KVS) {
+				client := http.Client{
+					Timeout: time.Second * 1,
+				}
+
+				for {
+					url := "http://" + current.Nodes[i] + "/gossip"
+					view_marshalled, _ := json.Marshal(k[i])
+					r, err := http.NewRequest("PUT", url, strings.NewReader(string(view_marshalled)))
+					if err != nil {
+						//fmt.Println("ERROR IN GOSSIP KVS")
+						continue
+					}
+					r.Header.Add("Content-Type", "application/json")
+					resp, _ := client.Do(r)
+					if resp.StatusCode == 200 {
+						break
+					}
+				}
+			}(k) */
+	}
+	/*
+			if targetShard != selfID {
+			vector := make(chan vclock.VClock)
+			for _, eachAddress := range getView[designatedIndex].Node {
+				go func(address string, vector chan vclock.VClock) {
+					client := http.Client{
+						Timeout: time.Second * 20,
+					}
+					view_marshalled, _ := json.Marshal(key)
+					r, _ := http.NewRequest("PUT", "http://"+address+"/kvs/data/"+k, strings.NewReader(string(view_marshalled)))
+					r.Header.Add("Content-Type", "application/json")
+					response, err := client.Do(r)
+					if err != nil {
+						return
+					}
+					res := KVS{}
+					json.NewDecoder(response.Body).Decode(&res)
+					response.Body.Close()
+					vector <- res.Vector
+				}(eachAddress, vector)
+
+			}
+
+			select {
+			case res := <-vector:
+				w.WriteHeader(200)
+				json.NewEncoder(w).Encode(struct {
+					Version vclock.VClock `json:"causal-metadata"`
+				}{res})
+			case <-time.After(20 * time.Second):
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(503)
+				json.NewEncoder(w).Encode(struct {
+					Error    string     `json:"error"`
+					Upstream NodeShards `json:"upstream"`
+				}{"upstream down", getView[designatedIndex]})
+			}
+			return
+		}
+	*/
 	w.WriteHeader(200)
 }
 
@@ -419,15 +520,22 @@ func create_kvs_view(w http.ResponseWriter, r *http.Request) {
 func compare_view(w http.ResponseWriter, r *http.Request) {
 	var v Shards
 	_ = json.NewDecoder(r.Body).Decode(&v)
-	inView = true
+
 	//maybe add || number shards == 0
 	if len(current.Nodes) == 0 {
+		//inView = true
 		current.Nodes = v.Nodes
 		current.Shard = v.Shard
 		set_shardView()
 		selfID = indexOf(os.Getenv("ADDRESS"), current.Nodes) % current.Shard
 		return
 	}
+	if !slices.Contains(current.Nodes, os.Getenv("ADDRESS")) {
+		fmt.Printf("")
+		inView = false
+		return
+	}
+	inView = true
 	//if the arrays are equal return
 	/*
 		if testEq(v.Nodes, current.Nodes) && (v.Shard == current.Shard) {
@@ -441,18 +549,42 @@ func compare_view(w http.ResponseWriter, r *http.Request) {
 		current.Shard = v.Shard
 		set_shardView()
 		selfID = indexOf(os.Getenv("ADDRESS"), current.Nodes) % current.Shard
-		for index, item := range keys {
-			if item.Value != "" {
+		for i := 0; i < len(keys); i++ {
+			//if item.Value != "" {
+			hashed_key := hash(keys[i].Key)
+			hash_key_64 := int64(hashed_key)
+			bucketNumber := jump_hash(hash_key_64, len(current.Nodes))
+			targetShard := bucketNumber % current.Shard
+			if targetShard != selfID {
+				//fmt.Println("GET OUT")
+				//if index == len(keys)-1 {
+
+				//}
+				keys = append(keys[:i], keys[i+1:]...)
+				i--
+			}
+			//}
+		}
+		/*
+			for index, item := range keys {
+				//if item.Value != "" {
 				hashed_key := hash(item.Key)
 				hash_key_64 := int64(hashed_key)
 				bucketNumber := jump_hash(hash_key_64, len(current.Nodes))
 				targetShard := bucketNumber % current.Shard
 				if targetShard != selfID {
 					//fmt.Println("GET OUT")
-					keys = append(keys[:index], keys[index+1:]...)
+					//if index == len(keys)-1 {
+
+					//}
+					keys[index] = keys[len(keys)-1]
+					keys = keys[:len(keys)-1]
+					fmt.Printf("%v\n", index)
+					//keys = append(keys[:index], keys[index+1:]...)
 				}
+				//}
 			}
-		}
+		*/
 		return
 	}
 
@@ -542,6 +674,7 @@ func create_kvs(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(418)
 		json.NewEncoder(w).Encode(map[string]string{"error": "uninitialized"})
+		return
 	}
 	//fmt.Println("we've entered create_kvs")
 
@@ -664,6 +797,42 @@ func create_kvs(w http.ResponseWriter, r *http.Request) {
 	key.Vector.Tick(key.Key)
 	key.Version, _ = key.Vector.FindTicks(key.Key)
 	key.Time = time.Now()
+	keys = append(keys, key)
+	w.WriteHeader(200)
+	json.NewEncoder(w).Encode(struct {
+		Version vclock.VClock `json:"causal-metadata"`
+	}{key.Vector})
+}
+
+func putNoCausal(w http.ResponseWriter, r *http.Request) {
+	if !inView {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(418)
+		json.NewEncoder(w).Encode(map[string]string{"error": "uninitialized"})
+	}
+	//fmt.Println("we've entered create_kvs")
+
+	w.Header().Set("Content-Type", "application/json")
+
+	//gets the JSON body
+	var key KVS
+	_ = json.NewDecoder(r.Body).Decode(&key)
+
+	if key.Vector == nil {
+		key.Vector = vclock.New()
+	}
+
+	//checks if it's in memory, if so replace it
+	for _, item := range keys {
+		if item.Key == key.Key && item.Value != "" {
+			w.WriteHeader(200)
+			return
+		}
+	}
+	//fmt.Println("we've passed flag2")
+
+	//if it's a new key
+	//make new clock and tick it
 	keys = append(keys, key)
 	w.WriteHeader(200)
 	json.NewEncoder(w).Encode(struct {
@@ -804,6 +973,7 @@ func main() {
 	router.HandleFunc("/kvs/data", get_all_keys).Methods("GET")
 	router.HandleFunc("/gossip/view", compare_view).Methods("PUT")
 	router.HandleFunc("/gossip", compare_kvs).Methods("PUT")
+	router.HandleFunc("/putNo", putNoCausal).Methods("PUT")
 	router.HandleFunc("/kvs/admin/view", handle_kvs_view).Methods("GET", "PUT", "DELETE")
 	router.HandleFunc("/kvs/data/{key}", handle_kvs).Methods("GET", "PUT", "DELETE")
 
