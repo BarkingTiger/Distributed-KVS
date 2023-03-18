@@ -1,0 +1,1 @@
+For causal dependency tracking, we used a vector clock that incremented based on the key. For spreading the view and information between nodes, we used a gossip protocol. For sharding, we used a jump consistent hash to choose which shard each key went into. 
