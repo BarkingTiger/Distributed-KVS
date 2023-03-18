@@ -643,10 +643,10 @@ func create_kvs(w http.ResponseWriter, r *http.Request) {
 	for index, item := range keys {
 		if item.Key == k && item.Value != "" {
 			item.Value = key.Value
-			item.Version += 1
-			//increment clock
+			item.Vector.Merge(key.Vector)
 			item.Vector.Tick(item.Key)
-			key.Time = time.Now()
+			item.Version, _ = item.Vector.FindTicks(item.Key)
+			item.Time = time.Now()
 			keys = append(keys[:index], keys[index+1:]...)
 			keys = append(keys, item)
 			w.WriteHeader(200)
@@ -662,7 +662,7 @@ func create_kvs(w http.ResponseWriter, r *http.Request) {
 	//make new clock and tick it
 	key.Key = k
 	key.Vector.Tick(key.Key)
-	key.Version = 1
+	key.Version, _ = key.Vector.FindTicks(key.Key)
 	key.Time = time.Now()
 	keys = append(keys, key)
 	w.WriteHeader(200)
