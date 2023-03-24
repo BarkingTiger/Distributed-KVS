@@ -1,0 +1,252 @@
+time="2023-03-23T07:42:50Z" level=info msg="multiple tests are executed with different weights." group=kkhau
+time="2023-03-23T07:42:50Z" level=info msg="when a test logs an Error it fail-stops, but when a test logs a Warning the test continues (but you don't get the points for the part where the warning was logged." group=kkhau
+time="2023-03-23T07:42:50Z" level=info msg="all data operations were done with a time-out of >=20 seconds; and \"context deadline exceeded\" means longer waits." group=kkhau
+time="2023-03-23T07:42:50Z" level=info msg="all tests that expect a non-500 status code were done after waiting for the eventual consistency period, or the partition that receives the request has the entire causal history of the request." group=kkhau
+time="2023-03-23T07:42:50Z" level=info msg="after each view change or network heal, your system had >=10 seconds to ensure consistency." group=kkhau
+time="2023-03-23T07:42:50Z" level=info msg="running a total of 14 tests" group=kkhau
+time="2023-03-23T07:42:50Z" level=info msg="starting test 1: (basicKV test with 4 nodes and 1 shard(s) (weight=2)" group=kkhau
+time="2023-03-23T07:42:50Z" level=info msg="starting test. Steps: 1. create a cluster (launch processes; wait 10s; PUT view); 2. get the view from all nodes and expect consistency; 3. do non-causally-dependent writes (all with CM={}) sprayed across all nodes (keys [1, N]); 4. do causally-dependent writes (use CM received after first req in second and so on) sprayed across all nodes (keys [N+1, 2N]); 5. do reads on writes of step 4 (from all nodes, all with reused CM (frm previous access or the end of step 4)) and expect latest values; 6. wait for eventual consistency (10s); 7. do reads on writes of step 3 (from all nodes, all with CM={}) and expect consistent values from all nodes (tie-breaking); 8. get key list and expect total to be 2N. Steps 1-5 and 7-8 each have 10 points for a total of 70." group=kkhau test=basicKeyVal viewConfig="NumNodes: 4, NumShards: 1"
+time="2023-03-23T07:42:50Z" level=info msg="nodes created, sleeping for 10s (to let nodes start up)" group=kkhau test=basicKeyVal
+time="2023-03-23T07:43:00Z" level=info msg="putting view to the nodes" group=kkhau test=basicKeyVal
+time="2023-03-23T07:43:00Z" level=info msg="score +10 - put view successful" group=kkhau score=10 test=basicKeyVal
+time="2023-03-23T07:43:00Z" level=info msg="sleeping for 10s (to let nodes set up the view)" group=kkhau test=basicKeyVal
+time="2023-03-23T07:43:10Z" level=info msg="getting views from nodes and checking consistency" group=kkhau test=basicKeyVal
+time="2023-03-23T07:43:10Z" level=warning msg="get view error: failed to get view from node 10.1.220.28:8080: json: cannot unmarshal number into Go struct field ViewRespShard.View.shard_id of type string" group=kkhau test=basicKeyVal
+time="2023-03-23T07:43:10Z" level=info msg="putting independent key-value pairs (CM={}) to all nodes, minKeyIndex=1, maxKeyIndex=4, minValIndexPerKey=1, maxValIndexPerKey=3" group=kkhau test=basicKeyVal
+time="2023-03-23T07:43:10Z" level=info msg="score +10 - put independent key-value pairs successful" group=kkhau score=20 test=basicKeyVal
+time="2023-03-23T07:43:10Z" level=info msg="putting dependent key-value pairs (reusing CM) to all nodes, minKeyIndex=5, maxKeyIndex=8, minValIndexPerKey=1, maxValIndexPerKey=3" group=kkhau test=basicKeyVal
+time="2023-03-23T07:43:10Z" level=info msg="score +10 - put dependent key-value pairs successful" group=kkhau score=30 test=basicKeyVal
+time="2023-03-23T07:43:10Z" level=info msg="getting dependent key-value pairs (reusing CM) from all nodes and expecting latest value, minKeyIndex=5, maxKeyIndex=8, expectedValIndex=3" group=kkhau test=basicKeyVal
+time="2023-03-23T07:43:14Z" level=info msg="score +10 - get dependent key-value pairs successful" group=kkhau score=40 test=basicKeyVal
+time="2023-03-23T07:43:14Z" level=info msg="sleeping for 11s (to let nodes become eventually consistent)" group=kkhau test=basicKeyVal
+time="2023-03-23T07:43:25Z" level=info msg="getting independent key-value pairs (with CM={}) from all nodes and expecting consistent values, minKeyIndex=1, maxKeyIndex=4, minValIndexPerKey=1, maxValIndexPerKey=3" group=kkhau test=basicKeyVal
+time="2023-03-23T07:43:29Z" level=info msg="score +10 - get independent key-value pairs successful" group=kkhau score=50 test=basicKeyVal
+time="2023-03-23T07:43:29Z" level=info msg="getting key list from all nodes and expecting 2N nodes in total" group=kkhau test=basicKeyVal
+time="2023-03-23T07:43:29Z" level=error msg="key list failed: failed to get key list from node 1: json: cannot unmarshal number into Go struct field KeyListBody.shard_id of type string" group=kkhau test=basicKeyVal
+time="2023-03-23T07:43:31Z" level=info msg="test completed." finalScore=50 group=kkhau test=basicKeyVal
+time="2023-03-23T07:43:31Z" level=info msg="finished test 1 with score 50/70" group=kkhau
+time="2023-03-23T07:43:31Z" level=warning msg="test 1 did not finish with full score (50/70) (test description: (basicKV test with 4 nodes and 1 shard(s) (weight=2))" group=kkhau
+time="2023-03-23T07:43:31Z" level=info msg="starting test 2: (basicKV test with 4 nodes and 2 shard(s) (weight=2)" group=kkhau
+time="2023-03-23T07:43:31Z" level=info msg="starting test. Steps: 1. create a cluster (launch processes; wait 10s; PUT view); 2. get the view from all nodes and expect consistency; 3. do non-causally-dependent writes (all with CM={}) sprayed across all nodes (keys [1, N]); 4. do causally-dependent writes (use CM received after first req in second and so on) sprayed across all nodes (keys [N+1, 2N]); 5. do reads on writes of step 4 (from all nodes, all with reused CM (frm previous access or the end of step 4)) and expect latest values; 6. wait for eventual consistency (10s); 7. do reads on writes of step 3 (from all nodes, all with CM={}) and expect consistent values from all nodes (tie-breaking); 8. get key list and expect total to be 2N. Steps 1-5 and 7-8 each have 10 points for a total of 70." group=kkhau test=basicKeyVal viewConfig="NumNodes: 4, NumShards: 2"
+time="2023-03-23T07:43:31Z" level=info msg="nodes created, sleeping for 10s (to let nodes start up)" group=kkhau test=basicKeyVal
+time="2023-03-23T07:43:41Z" level=info msg="putting view to the nodes" group=kkhau test=basicKeyVal
+time="2023-03-23T07:43:41Z" level=info msg="score +10 - put view successful" group=kkhau score=10 test=basicKeyVal
+time="2023-03-23T07:43:41Z" level=info msg="sleeping for 10s (to let nodes set up the view)" group=kkhau test=basicKeyVal
+time="2023-03-23T07:43:51Z" level=info msg="getting views from nodes and checking consistency" group=kkhau test=basicKeyVal
+time="2023-03-23T07:43:51Z" level=warning msg="get view error: failed to get view from node 10.1.220.21:8080: json: cannot unmarshal number into Go struct field ViewRespShard.View.shard_id of type string" group=kkhau test=basicKeyVal
+time="2023-03-23T07:43:51Z" level=info msg="putting independent key-value pairs (CM={}) to all nodes, minKeyIndex=1, maxKeyIndex=4, minValIndexPerKey=1, maxValIndexPerKey=3" group=kkhau test=basicKeyVal
+time="2023-03-23T07:43:51Z" level=info msg="score +10 - put independent key-value pairs successful" group=kkhau score=20 test=basicKeyVal
+time="2023-03-23T07:43:51Z" level=info msg="putting dependent key-value pairs (reusing CM) to all nodes, minKeyIndex=5, maxKeyIndex=8, minValIndexPerKey=1, maxValIndexPerKey=3" group=kkhau test=basicKeyVal
+time="2023-03-23T07:43:51Z" level=info msg="score +10 - put dependent key-value pairs successful" group=kkhau score=30 test=basicKeyVal
+time="2023-03-23T07:43:51Z" level=info msg="getting dependent key-value pairs (reusing CM) from all nodes and expecting latest value, minKeyIndex=5, maxKeyIndex=8, expectedValIndex=3" group=kkhau test=basicKeyVal
+time="2023-03-23T07:43:58Z" level=info msg="score +10 - get dependent key-value pairs successful" group=kkhau score=40 test=basicKeyVal
+time="2023-03-23T07:43:58Z" level=info msg="sleeping for 11s (to let nodes become eventually consistent)" group=kkhau test=basicKeyVal
+time="2023-03-23T07:44:09Z" level=info msg="getting independent key-value pairs (with CM={}) from all nodes and expecting consistent values, minKeyIndex=1, maxKeyIndex=4, minValIndexPerKey=1, maxValIndexPerKey=3" group=kkhau test=basicKeyVal
+time="2023-03-23T07:44:14Z" level=info msg="score +10 - get independent key-value pairs successful" group=kkhau score=50 test=basicKeyVal
+time="2023-03-23T07:44:14Z" level=info msg="getting key list from all nodes and expecting 2N nodes in total" group=kkhau test=basicKeyVal
+time="2023-03-23T07:44:14Z" level=error msg="key list failed: failed to get key list from node 1: json: cannot unmarshal number into Go struct field KeyListBody.shard_id of type string" group=kkhau test=basicKeyVal
+time="2023-03-23T07:44:16Z" level=info msg="test completed." finalScore=50 group=kkhau test=basicKeyVal
+time="2023-03-23T07:44:16Z" level=info msg="finished test 2 with score 50/70" group=kkhau
+time="2023-03-23T07:44:16Z" level=warning msg="test 2 did not finish with full score (50/70) (test description: (basicKV test with 4 nodes and 2 shard(s) (weight=2))" group=kkhau
+time="2023-03-23T07:44:16Z" level=info msg="starting test 3: availability test with 6 nodes and 2 shards (weight=4)" group=kkhau
+time="2023-03-23T07:44:16Z" level=info msg="starting test. Steps: 1. create a cluster (launch processes; wait 10s; PUT view); 2. get the view from all nodes and expect consistency; 3. partition the nodes so that each partition contains 1+ node from each shard; 4. do non-causally-dependent writes (all with CM={}) sprayed across all partitions (keys [1, N]); 5. do causally-dependent writes (use CM received after first req in second and so on) sprayed across all partitions (keys [N+1, 2N]); 6. do reads on writes of step 5 (from all partitions, all with reused CM (frm previous access or the end of step 5)) and expect latest values or stall-fails; 7. heal the network and wait for eventual consistency (10s); 8. do reads on writes of step 4 and 5 (from all nodes, all with CM={}) and expect consistent values from all nodes (tie-breaking) for keys [1, N] and latest values for keys [N+1, 2N]. Steps 4-6 each have 10 points and step 8 has 20 points for a total of 50." group=kkhau test=availability viewConfig="NumNodes: 6, NumShards: 2"
+time="2023-03-23T07:44:16Z" level=info msg="nodes created, sleeping for 10s (to let nodes start up)" group=kkhau test=availability
+time="2023-03-23T07:44:26Z" level=info msg="putting view to the nodes" group=kkhau test=availability
+time="2023-03-23T07:44:26Z" level=info msg="put view successful" group=kkhau test=availability
+time="2023-03-23T07:44:26Z" level=info msg="sleeping for 10s (to let nodes set up the view)" group=kkhau test=availability
+time="2023-03-23T07:44:36Z" level=info msg="getting views from nodes and checking consistency" group=kkhau test=availability
+time="2023-03-23T07:44:36Z" level=error msg="get view failed: failed to get view from node 10.1.220.12:8080: json: cannot unmarshal number into Go struct field ViewRespShard.View.shard_id of type string" group=kkhau test=availability
+time="2023-03-23T07:44:40Z" level=info msg="test completed." finalScore=0 group=kkhau test=availability
+time="2023-03-23T07:44:40Z" level=info msg="finished test 3 with score 0/50" group=kkhau
+time="2023-03-23T07:44:40Z" level=warning msg="test 3 did not finish with full score (0/50) (test description: availability test with 6 nodes and 2 shards (weight=4))" group=kkhau
+time="2023-03-23T07:44:40Z" level=info msg="starting test 4: availability test with 6 nodes and 3 shards (weight=4)" group=kkhau
+time="2023-03-23T07:44:40Z" level=info msg="starting test. Steps: 1. create a cluster (launch processes; wait 10s; PUT view); 2. get the view from all nodes and expect consistency; 3. partition the nodes so that each partition contains 1+ node from each shard; 4. do non-causally-dependent writes (all with CM={}) sprayed across all partitions (keys [1, N]); 5. do causally-dependent writes (use CM received after first req in second and so on) sprayed across all partitions (keys [N+1, 2N]); 6. do reads on writes of step 5 (from all partitions, all with reused CM (frm previous access or the end of step 5)) and expect latest values or stall-fails; 7. heal the network and wait for eventual consistency (10s); 8. do reads on writes of step 4 and 5 (from all nodes, all with CM={}) and expect consistent values from all nodes (tie-breaking) for keys [1, N] and latest values for keys [N+1, 2N]. Steps 4-6 each have 10 points and step 8 has 20 points for a total of 50." group=kkhau test=availability viewConfig="NumNodes: 6, NumShards: 3"
+time="2023-03-23T07:44:40Z" level=info msg="nodes created, sleeping for 10s (to let nodes start up)" group=kkhau test=availability
+time="2023-03-23T07:44:50Z" level=info msg="putting view to the nodes" group=kkhau test=availability
+time="2023-03-23T07:44:50Z" level=info msg="put view successful" group=kkhau test=availability
+time="2023-03-23T07:44:50Z" level=info msg="sleeping for 10s (to let nodes set up the view)" group=kkhau test=availability
+time="2023-03-23T07:45:00Z" level=info msg="getting views from nodes and checking consistency" group=kkhau test=availability
+time="2023-03-23T07:45:00Z" level=error msg="get view failed: failed to get view from node 10.1.220.13:8080: json: cannot unmarshal number into Go struct field ViewRespShard.View.shard_id of type string" group=kkhau test=availability
+time="2023-03-23T07:45:04Z" level=info msg="test completed." finalScore=0 group=kkhau test=availability
+time="2023-03-23T07:45:04Z" level=info msg="finished test 4 with score 0/50" group=kkhau
+time="2023-03-23T07:45:04Z" level=warning msg="test 4 did not finish with full score (0/50) (test description: availability test with 6 nodes and 3 shards (weight=4))" group=kkhau
+time="2023-03-23T07:45:04Z" level=info msg="starting test 5: viewChange test (killNodes=false) (weight=3)" group=kkhau
+time="2023-03-23T07:45:04Z" level=info msg="starting test. Steps: 1. create all needed nodes for the test some of which may be killed at step 6 (launch processes; wait 10s); 2. put viewConfig1; 3. get the view from all nodes and expect consistency; 4. do non-causally-dependent writes (all with CM={}) sprayed across all nodes (keys [1, N]); 5. do causally-dependent writes (use CM received after first req in second and so on) sprayed across all nodes (keys [N+1, 2N]); 6. if killNodes==true, wait for eventual consistency and then kill all but one node from each shard; 7. put viewConfig2 (possibly with new nodes if viewConfig2 has more nodes or some have been killed); 8. get the view from all nodes and expect consistency; 9. do reads on writes of step 4 and 5 (from all current nodes, all with CM={}) and expect consistent values from all nodes (tie-breaking) for keys [1, N] and latest values for keys [N+1, 2N]. Steps 7-8 each have 10 points and step 9 has 20 points for a total of 40." group=kkhau killNodes=false test=viewChange viewConfig1="NumNodes: 4, NumShards: 2" viewConfig2="NumNodes: 4, NumShards: 3"
+time="2023-03-23T07:45:04Z" level=info msg="nodes created, sleeping for 10s (to let nodes start up)" group=kkhau test=viewChange
+time="2023-03-23T07:45:14Z" level=info msg="putting view 1 to the nodes (NumNodes: 4, NumShards: 2)" group=kkhau test=viewChange
+time="2023-03-23T07:45:14Z" level=info msg="put view 1 successful" group=kkhau test=viewChange
+time="2023-03-23T07:45:14Z" level=info msg="sleeping for 10s (to let nodes set up the view)" group=kkhau test=viewChange
+time="2023-03-23T07:45:24Z" level=info msg="getting views from nodes and checking consistency" group=kkhau test=viewChange
+time="2023-03-23T07:45:24Z" level=warning msg="get view failed: failed to get view from node 10.1.220.10:8080: json: cannot unmarshal number into Go struct field ViewRespShard.View.shard_id of type string" group=kkhau test=viewChange
+time="2023-03-23T07:45:24Z" level=info msg="putting independent key-value pairs (CM={}) to all nodes, minKeyIndex=1, maxKeyIndex=4, minValIndexPerKey=1, maxValIndexPerKey=3" group=kkhau test=viewChange
+time="2023-03-23T07:45:24Z" level=info msg="put independent key-value pairs successful" group=kkhau test=viewChange
+time="2023-03-23T07:45:24Z" level=info msg="putting dependent key-value pairs (reusing CM) to all partitions, minKeyIndex=5, maxKeyIndex=8, minValIndexPerKey=1, maxValIndexPerKey=3" group=kkhau test=viewChange
+time="2023-03-23T07:45:24Z" level=info msg="put dependent key-value pairs successful" group=kkhau test=viewChange
+time="2023-03-23T07:45:24Z" level=info msg="sleeping for 11s" group=kkhau test=viewChange
+time="2023-03-23T07:45:35Z" level=info msg="putting view 2 to the nodes (NumNodes: 4, NumShards: 3)" group=kkhau test=viewChange
+time="2023-03-23T07:45:35Z" level=info msg="score +10 - put view 2 successful" group=kkhau score=10 test=viewChange
+time="2023-03-23T07:45:35Z" level=info msg="sleeping for 10s (to let nodes set up the view)" group=kkhau test=viewChange
+time="2023-03-23T07:45:45Z" level=info msg="getting views from nodes and checking consistency" group=kkhau test=viewChange
+time="2023-03-23T07:45:45Z" level=warning msg="get view failed: failed to get view from node 10.1.220.10:8080: json: cannot unmarshal number into Go struct field ViewRespShard.View.shard_id of type string" group=kkhau test=viewChange
+time="2023-03-23T07:45:45Z" level=info msg="getting dependent key-value pairs (with CM={}) from all nodes and expecting latest value, minKeyIndex=5, maxKeyIndex=8, expectedValIndex=3" group=kkhau test=viewChange
+time="2023-03-23T07:45:53Z" level=info msg="score +10 - get dependent key-value pairs successful" group=kkhau score=20 test=viewChange
+time="2023-03-23T07:45:53Z" level=info msg="getting independent key-value pairs (with CM={}) from all nodes and expecting consistent values, minKeyIndex=1, maxKeyIndex=4, minValIndexPerKey=1, maxValIndexPerKey=3" group=kkhau test=viewChange
+time="2023-03-23T07:45:59Z" level=info msg="score +10 - get independent key-value pairs successful" group=kkhau score=30 test=viewChange
+time="2023-03-23T07:46:01Z" level=info msg="test completed." finalScore=30 group=kkhau test=viewChange
+time="2023-03-23T07:46:01Z" level=info msg="finished test 5 with score 30/40" group=kkhau
+time="2023-03-23T07:46:01Z" level=warning msg="test 5 did not finish with full score (30/40) (test description: viewChange test (killNodes=false) (weight=3))" group=kkhau
+time="2023-03-23T07:46:01Z" level=info msg="starting test 6: viewChange test (killNodes=false) (weight=3)" group=kkhau
+time="2023-03-23T07:46:01Z" level=info msg="starting test. Steps: 1. create all needed nodes for the test some of which may be killed at step 6 (launch processes; wait 10s); 2. put viewConfig1; 3. get the view from all nodes and expect consistency; 4. do non-causally-dependent writes (all with CM={}) sprayed across all nodes (keys [1, N]); 5. do causally-dependent writes (use CM received after first req in second and so on) sprayed across all nodes (keys [N+1, 2N]); 6. if killNodes==true, wait for eventual consistency and then kill all but one node from each shard; 7. put viewConfig2 (possibly with new nodes if viewConfig2 has more nodes or some have been killed); 8. get the view from all nodes and expect consistency; 9. do reads on writes of step 4 and 5 (from all current nodes, all with CM={}) and expect consistent values from all nodes (tie-breaking) for keys [1, N] and latest values for keys [N+1, 2N]. Steps 7-8 each have 10 points and step 9 has 20 points for a total of 40." group=kkhau killNodes=false test=viewChange viewConfig1="NumNodes: 4, NumShards: 2" viewConfig2="NumNodes: 5, NumShards: 3"
+time="2023-03-23T07:46:01Z" level=info msg="nodes created, sleeping for 10s (to let nodes start up)" group=kkhau test=viewChange
+time="2023-03-23T07:46:11Z" level=info msg="putting view 1 to the nodes (NumNodes: 4, NumShards: 2)" group=kkhau test=viewChange
+time="2023-03-23T07:46:11Z" level=info msg="put view 1 successful" group=kkhau test=viewChange
+time="2023-03-23T07:46:11Z" level=info msg="sleeping for 10s (to let nodes set up the view)" group=kkhau test=viewChange
+time="2023-03-23T07:46:21Z" level=info msg="getting views from nodes and checking consistency" group=kkhau test=viewChange
+time="2023-03-23T07:46:21Z" level=warning msg="get view failed: failed to get view from node 10.1.220.19:8080: json: cannot unmarshal number into Go struct field ViewRespShard.View.shard_id of type string" group=kkhau test=viewChange
+time="2023-03-23T07:46:21Z" level=info msg="putting independent key-value pairs (CM={}) to all nodes, minKeyIndex=1, maxKeyIndex=4, minValIndexPerKey=1, maxValIndexPerKey=3" group=kkhau test=viewChange
+time="2023-03-23T07:46:21Z" level=info msg="put independent key-value pairs successful" group=kkhau test=viewChange
+time="2023-03-23T07:46:21Z" level=info msg="putting dependent key-value pairs (reusing CM) to all partitions, minKeyIndex=5, maxKeyIndex=8, minValIndexPerKey=1, maxValIndexPerKey=3" group=kkhau test=viewChange
+time="2023-03-23T07:46:21Z" level=info msg="put dependent key-value pairs successful" group=kkhau test=viewChange
+time="2023-03-23T07:46:21Z" level=info msg="sleeping for 11s" group=kkhau test=viewChange
+time="2023-03-23T07:46:32Z" level=info msg="putting view 2 to the nodes (NumNodes: 5, NumShards: 3)" group=kkhau test=viewChange
+time="2023-03-23T07:46:32Z" level=info msg="score +10 - put view 2 successful" group=kkhau score=10 test=viewChange
+time="2023-03-23T07:46:32Z" level=info msg="sleeping for 10s (to let nodes set up the view)" group=kkhau test=viewChange
+time="2023-03-23T07:46:42Z" level=info msg="getting views from nodes and checking consistency" group=kkhau test=viewChange
+time="2023-03-23T07:46:42Z" level=warning msg="get view failed: failed to get view from node 10.1.220.19:8080: json: cannot unmarshal number into Go struct field ViewRespShard.View.shard_id of type string" group=kkhau test=viewChange
+time="2023-03-23T07:46:42Z" level=info msg="getting dependent key-value pairs (with CM={}) from all nodes and expecting latest value, minKeyIndex=5, maxKeyIndex=8, expectedValIndex=3" group=kkhau test=viewChange
+time="2023-03-23T07:46:48Z" level=info msg="score +10 - get dependent key-value pairs successful" group=kkhau score=20 test=viewChange
+time="2023-03-23T07:46:48Z" level=info msg="getting independent key-value pairs (with CM={}) from all nodes and expecting consistent values, minKeyIndex=1, maxKeyIndex=4, minValIndexPerKey=1, maxValIndexPerKey=3" group=kkhau test=viewChange
+time="2023-03-23T07:46:55Z" level=info msg="score +10 - get independent key-value pairs successful" group=kkhau score=30 test=viewChange
+time="2023-03-23T07:46:58Z" level=info msg="test completed." finalScore=30 group=kkhau test=viewChange
+time="2023-03-23T07:46:58Z" level=info msg="finished test 6 with score 30/40" group=kkhau
+time="2023-03-23T07:46:58Z" level=warning msg="test 6 did not finish with full score (30/40) (test description: viewChange test (killNodes=false) (weight=3))" group=kkhau
+time="2023-03-23T07:46:58Z" level=info msg="starting test 7: viewChange test (killNodes=false) (weight=3)" group=kkhau
+time="2023-03-23T07:46:58Z" level=info msg="starting test. Steps: 1. create all needed nodes for the test some of which may be killed at step 6 (launch processes; wait 10s); 2. put viewConfig1; 3. get the view from all nodes and expect consistency; 4. do non-causally-dependent writes (all with CM={}) sprayed across all nodes (keys [1, N]); 5. do causally-dependent writes (use CM received after first req in second and so on) sprayed across all nodes (keys [N+1, 2N]); 6. if killNodes==true, wait for eventual consistency and then kill all but one node from each shard; 7. put viewConfig2 (possibly with new nodes if viewConfig2 has more nodes or some have been killed); 8. get the view from all nodes and expect consistency; 9. do reads on writes of step 4 and 5 (from all current nodes, all with CM={}) and expect consistent values from all nodes (tie-breaking) for keys [1, N] and latest values for keys [N+1, 2N]. Steps 7-8 each have 10 points and step 9 has 20 points for a total of 40." group=kkhau killNodes=false test=viewChange viewConfig1="NumNodes: 4, NumShards: 2" viewConfig2="NumNodes: 2, NumShards: 2"
+time="2023-03-23T07:46:58Z" level=info msg="nodes created, sleeping for 10s (to let nodes start up)" group=kkhau test=viewChange
+time="2023-03-23T07:47:08Z" level=info msg="putting view 1 to the nodes (NumNodes: 4, NumShards: 2)" group=kkhau test=viewChange
+time="2023-03-23T07:47:08Z" level=info msg="put view 1 successful" group=kkhau test=viewChange
+time="2023-03-23T07:47:08Z" level=info msg="sleeping for 10s (to let nodes set up the view)" group=kkhau test=viewChange
+time="2023-03-23T07:47:18Z" level=info msg="getting views from nodes and checking consistency" group=kkhau test=viewChange
+time="2023-03-23T07:47:18Z" level=warning msg="get view failed: failed to get view from node 10.1.220.29:8080: json: cannot unmarshal number into Go struct field ViewRespShard.View.shard_id of type string" group=kkhau test=viewChange
+time="2023-03-23T07:47:18Z" level=info msg="putting independent key-value pairs (CM={}) to all nodes, minKeyIndex=1, maxKeyIndex=4, minValIndexPerKey=1, maxValIndexPerKey=3" group=kkhau test=viewChange
+time="2023-03-23T07:47:18Z" level=info msg="put independent key-value pairs successful" group=kkhau test=viewChange
+time="2023-03-23T07:47:18Z" level=info msg="putting dependent key-value pairs (reusing CM) to all partitions, minKeyIndex=5, maxKeyIndex=8, minValIndexPerKey=1, maxValIndexPerKey=3" group=kkhau test=viewChange
+time="2023-03-23T07:47:18Z" level=info msg="put dependent key-value pairs successful" group=kkhau test=viewChange
+time="2023-03-23T07:47:18Z" level=info msg="sleeping for 11s" group=kkhau test=viewChange
+time="2023-03-23T07:47:29Z" level=info msg="putting view 2 to the nodes (NumNodes: 2, NumShards: 2)" group=kkhau test=viewChange
+time="2023-03-23T07:47:29Z" level=info msg="score +10 - put view 2 successful" group=kkhau score=10 test=viewChange
+time="2023-03-23T07:47:29Z" level=info msg="sleeping for 10s (to let nodes set up the view)" group=kkhau test=viewChange
+time="2023-03-23T07:47:39Z" level=info msg="getting views from nodes and checking consistency" group=kkhau test=viewChange
+time="2023-03-23T07:47:39Z" level=warning msg="get view failed: failed to get view from node 10.1.220.29:8080: json: cannot unmarshal number into Go struct field ViewRespShard.View.shard_id of type string" group=kkhau test=viewChange
+time="2023-03-23T07:47:39Z" level=info msg="getting dependent key-value pairs (with CM={}) from all nodes and expecting latest value, minKeyIndex=5, maxKeyIndex=8, expectedValIndex=3" group=kkhau test=viewChange
+time="2023-03-23T07:47:45Z" level=info msg="score +10 - get dependent key-value pairs successful" group=kkhau score=20 test=viewChange
+time="2023-03-23T07:47:45Z" level=info msg="getting independent key-value pairs (with CM={}) from all nodes and expecting consistent values, minKeyIndex=1, maxKeyIndex=4, minValIndexPerKey=1, maxValIndexPerKey=3" group=kkhau test=viewChange
+time="2023-03-23T07:47:47Z" level=warning msg="failed to get independent key-value pairs: failed to get key key-1 from node 10.1.220.37:8080 with CM={} (expecting val in [val-1-1 val-1-2 val-1-3]), val= not in accepted vals" group=kkhau test=viewChange
+time="2023-03-23T07:47:53Z" level=info msg="test completed." finalScore=20 group=kkhau test=viewChange
+time="2023-03-23T07:47:53Z" level=info msg="finished test 7 with score 20/40" group=kkhau
+time="2023-03-23T07:47:53Z" level=warning msg="test 7 did not finish with full score (20/40) (test description: viewChange test (killNodes=false) (weight=3))" group=kkhau
+time="2023-03-23T07:47:53Z" level=info msg="starting test 8: viewChange test (killNodes=false) (weight=3)" group=kkhau
+time="2023-03-23T07:47:53Z" level=info msg="starting test. Steps: 1. create all needed nodes for the test some of which may be killed at step 6 (launch processes; wait 10s); 2. put viewConfig1; 3. get the view from all nodes and expect consistency; 4. do non-causally-dependent writes (all with CM={}) sprayed across all nodes (keys [1, N]); 5. do causally-dependent writes (use CM received after first req in second and so on) sprayed across all nodes (keys [N+1, 2N]); 6. if killNodes==true, wait for eventual consistency and then kill all but one node from each shard; 7. put viewConfig2 (possibly with new nodes if viewConfig2 has more nodes or some have been killed); 8. get the view from all nodes and expect consistency; 9. do reads on writes of step 4 and 5 (from all current nodes, all with CM={}) and expect consistent values from all nodes (tie-breaking) for keys [1, N] and latest values for keys [N+1, 2N]. Steps 7-8 each have 10 points and step 9 has 20 points for a total of 40." group=kkhau killNodes=false test=viewChange viewConfig1="NumNodes: 4, NumShards: 3" viewConfig2="NumNodes: 2, NumShards: 1"
+time="2023-03-23T07:47:53Z" level=info msg="nodes created, sleeping for 10s (to let nodes start up)" group=kkhau test=viewChange
+time="2023-03-23T07:48:03Z" level=info msg="putting view 1 to the nodes (NumNodes: 4, NumShards: 3)" group=kkhau test=viewChange
+time="2023-03-23T07:48:03Z" level=info msg="put view 1 successful" group=kkhau test=viewChange
+time="2023-03-23T07:48:03Z" level=info msg="sleeping for 10s (to let nodes set up the view)" group=kkhau test=viewChange
+time="2023-03-23T07:48:13Z" level=info msg="getting views from nodes and checking consistency" group=kkhau test=viewChange
+time="2023-03-23T07:48:13Z" level=warning msg="get view failed: failed to get view from node 10.1.220.17:8080: json: cannot unmarshal number into Go struct field ViewRespShard.View.shard_id of type string" group=kkhau test=viewChange
+time="2023-03-23T07:48:13Z" level=info msg="putting independent key-value pairs (CM={}) to all nodes, minKeyIndex=1, maxKeyIndex=4, minValIndexPerKey=1, maxValIndexPerKey=3" group=kkhau test=viewChange
+time="2023-03-23T07:48:13Z" level=info msg="put independent key-value pairs successful" group=kkhau test=viewChange
+time="2023-03-23T07:48:13Z" level=info msg="putting dependent key-value pairs (reusing CM) to all partitions, minKeyIndex=5, maxKeyIndex=8, minValIndexPerKey=1, maxValIndexPerKey=3" group=kkhau test=viewChange
+time="2023-03-23T07:48:13Z" level=info msg="put dependent key-value pairs successful" group=kkhau test=viewChange
+time="2023-03-23T07:48:13Z" level=info msg="sleeping for 11s" group=kkhau test=viewChange
+time="2023-03-23T07:48:24Z" level=info msg="putting view 2 to the nodes (NumNodes: 2, NumShards: 1)" group=kkhau test=viewChange
+time="2023-03-23T07:48:24Z" level=info msg="score +10 - put view 2 successful" group=kkhau score=10 test=viewChange
+time="2023-03-23T07:48:24Z" level=info msg="sleeping for 10s (to let nodes set up the view)" group=kkhau test=viewChange
+time="2023-03-23T07:48:34Z" level=info msg="getting views from nodes and checking consistency" group=kkhau test=viewChange
+time="2023-03-23T07:48:34Z" level=warning msg="get view failed: failed to get view from node 10.1.220.17:8080: json: cannot unmarshal number into Go struct field ViewRespShard.View.shard_id of type string" group=kkhau test=viewChange
+time="2023-03-23T07:48:34Z" level=info msg="getting dependent key-value pairs (with CM={}) from all nodes and expecting latest value, minKeyIndex=5, maxKeyIndex=8, expectedValIndex=3" group=kkhau test=viewChange
+time="2023-03-23T07:48:35Z" level=warning msg="failed to get dependent key-value pairs: failed to get key key-5 from node 10.1.220.18:8080 with CM={} (expecting val in [val-5-3]), expected status code in [200] but got 404" group=kkhau test=viewChange
+time="2023-03-23T07:48:35Z" level=info msg="getting independent key-value pairs (with CM={}) from all nodes and expecting consistent values, minKeyIndex=1, maxKeyIndex=4, minValIndexPerKey=1, maxValIndexPerKey=3" group=kkhau test=viewChange
+time="2023-03-23T07:48:39Z" level=info msg="score +10 - get independent key-value pairs successful" group=kkhau score=20 test=viewChange
+time="2023-03-23T07:48:43Z" level=info msg="test completed." finalScore=20 group=kkhau test=viewChange
+time="2023-03-23T07:48:43Z" level=info msg="finished test 8 with score 20/40" group=kkhau
+time="2023-03-23T07:48:43Z" level=warning msg="test 8 did not finish with full score (20/40) (test description: viewChange test (killNodes=false) (weight=3))" group=kkhau
+time="2023-03-23T07:48:43Z" level=info msg="starting test 9: viewChange test (killNodes=true) (weight=4)" group=kkhau
+time="2023-03-23T07:48:43Z" level=info msg="starting test. Steps: 1. create all needed nodes for the test some of which may be killed at step 6 (launch processes; wait 10s); 2. put viewConfig1; 3. get the view from all nodes and expect consistency; 4. do non-causally-dependent writes (all with CM={}) sprayed across all nodes (keys [1, N]); 5. do causally-dependent writes (use CM received after first req in second and so on) sprayed across all nodes (keys [N+1, 2N]); 6. if killNodes==true, wait for eventual consistency and then kill all but one node from each shard; 7. put viewConfig2 (possibly with new nodes if viewConfig2 has more nodes or some have been killed); 8. get the view from all nodes and expect consistency; 9. do reads on writes of step 4 and 5 (from all current nodes, all with CM={}) and expect consistent values from all nodes (tie-breaking) for keys [1, N] and latest values for keys [N+1, 2N]. Steps 7-8 each have 10 points and step 9 has 20 points for a total of 40." group=kkhau killNodes=true test=viewChange viewConfig1="NumNodes: 4, NumShards: 2" viewConfig2="NumNodes: 4, NumShards: 3"
+time="2023-03-23T07:48:43Z" level=info msg="nodes created, sleeping for 10s (to let nodes start up)" group=kkhau test=viewChange
+time="2023-03-23T07:48:53Z" level=info msg="putting view 1 to the nodes (NumNodes: 4, NumShards: 2)" group=kkhau test=viewChange
+time="2023-03-23T07:48:53Z" level=info msg="put view 1 successful" group=kkhau test=viewChange
+time="2023-03-23T07:48:53Z" level=info msg="sleeping for 10s (to let nodes set up the view)" group=kkhau test=viewChange
+time="2023-03-23T07:49:03Z" level=info msg="getting views from nodes and checking consistency" group=kkhau test=viewChange
+time="2023-03-23T07:49:03Z" level=error msg="get view failed: failed to get view from node 10.1.220.14:8080: json: cannot unmarshal number into Go struct field ViewRespShard.View.shard_id of type string" group=kkhau test=viewChange
+time="2023-03-23T07:49:07Z" level=info msg="test completed." finalScore=0 group=kkhau test=viewChange
+time="2023-03-23T07:49:07Z" level=info msg="finished test 9 with score 0/40" group=kkhau
+time="2023-03-23T07:49:07Z" level=warning msg="test 9 did not finish with full score (0/40) (test description: viewChange test (killNodes=true) (weight=4))" group=kkhau
+time="2023-03-23T07:49:07Z" level=info msg="starting test 10: viewChange test (killNodes=true) (weight=4)" group=kkhau
+time="2023-03-23T07:49:07Z" level=info msg="starting test. Steps: 1. create all needed nodes for the test some of which may be killed at step 6 (launch processes; wait 10s); 2. put viewConfig1; 3. get the view from all nodes and expect consistency; 4. do non-causally-dependent writes (all with CM={}) sprayed across all nodes (keys [1, N]); 5. do causally-dependent writes (use CM received after first req in second and so on) sprayed across all nodes (keys [N+1, 2N]); 6. if killNodes==true, wait for eventual consistency and then kill all but one node from each shard; 7. put viewConfig2 (possibly with new nodes if viewConfig2 has more nodes or some have been killed); 8. get the view from all nodes and expect consistency; 9. do reads on writes of step 4 and 5 (from all current nodes, all with CM={}) and expect consistent values from all nodes (tie-breaking) for keys [1, N] and latest values for keys [N+1, 2N]. Steps 7-8 each have 10 points and step 9 has 20 points for a total of 40." group=kkhau killNodes=true test=viewChange viewConfig1="NumNodes: 4, NumShards: 2" viewConfig2="NumNodes: 5, NumShards: 3"
+time="2023-03-23T07:49:07Z" level=info msg="nodes created, sleeping for 10s (to let nodes start up)" group=kkhau test=viewChange
+time="2023-03-23T07:49:21Z" level=info msg="putting view 1 to the nodes (NumNodes: 4, NumShards: 2)" group=kkhau test=viewChange
+time="2023-03-23T07:49:21Z" level=info msg="put view 1 successful" group=kkhau test=viewChange
+time="2023-03-23T07:49:21Z" level=info msg="sleeping for 10s (to let nodes set up the view)" group=kkhau test=viewChange
+time="2023-03-23T07:49:31Z" level=info msg="getting views from nodes and checking consistency" group=kkhau test=viewChange
+time="2023-03-23T07:49:31Z" level=error msg="get view failed: failed to get view from node 10.1.220.19:8080: json: cannot unmarshal number into Go struct field ViewRespShard.View.shard_id of type string" group=kkhau test=viewChange
+time="2023-03-23T07:49:36Z" level=info msg="test completed." finalScore=0 group=kkhau test=viewChange
+time="2023-03-23T07:49:36Z" level=info msg="finished test 10 with score 0/40" group=kkhau
+time="2023-03-23T07:49:36Z" level=warning msg="test 10 did not finish with full score (0/40) (test description: viewChange test (killNodes=true) (weight=4))" group=kkhau
+time="2023-03-23T07:49:36Z" level=info msg="starting test 11: viewChange test (killNodes=true) (weight=4)" group=kkhau
+time="2023-03-23T07:49:36Z" level=info msg="starting test. Steps: 1. create all needed nodes for the test some of which may be killed at step 6 (launch processes; wait 10s); 2. put viewConfig1; 3. get the view from all nodes and expect consistency; 4. do non-causally-dependent writes (all with CM={}) sprayed across all nodes (keys [1, N]); 5. do causally-dependent writes (use CM received after first req in second and so on) sprayed across all nodes (keys [N+1, 2N]); 6. if killNodes==true, wait for eventual consistency and then kill all but one node from each shard; 7. put viewConfig2 (possibly with new nodes if viewConfig2 has more nodes or some have been killed); 8. get the view from all nodes and expect consistency; 9. do reads on writes of step 4 and 5 (from all current nodes, all with CM={}) and expect consistent values from all nodes (tie-breaking) for keys [1, N] and latest values for keys [N+1, 2N]. Steps 7-8 each have 10 points and step 9 has 20 points for a total of 40." group=kkhau killNodes=true test=viewChange viewConfig1="NumNodes: 4, NumShards: 2" viewConfig2="NumNodes: 2, NumShards: 2"
+time="2023-03-23T07:49:36Z" level=info msg="nodes created, sleeping for 10s (to let nodes start up)" group=kkhau test=viewChange
+time="2023-03-23T07:49:49Z" level=info msg="putting view 1 to the nodes (NumNodes: 4, NumShards: 2)" group=kkhau test=viewChange
+time="2023-03-23T07:49:49Z" level=info msg="put view 1 successful" group=kkhau test=viewChange
+time="2023-03-23T07:49:49Z" level=info msg="sleeping for 10s (to let nodes set up the view)" group=kkhau test=viewChange
+time="2023-03-23T07:49:59Z" level=info msg="getting views from nodes and checking consistency" group=kkhau test=viewChange
+time="2023-03-23T07:49:59Z" level=error msg="get view failed: failed to get view from node 10.1.220.21:8080: json: cannot unmarshal number into Go struct field ViewRespShard.View.shard_id of type string" group=kkhau test=viewChange
+time="2023-03-23T07:50:01Z" level=info msg="test completed." finalScore=0 group=kkhau test=viewChange
+time="2023-03-23T07:50:01Z" level=info msg="finished test 11 with score 0/40" group=kkhau
+time="2023-03-23T07:50:01Z" level=warning msg="test 11 did not finish with full score (0/40) (test description: viewChange test (killNodes=true) (weight=4))" group=kkhau
+time="2023-03-23T07:50:01Z" level=info msg="starting test 12: viewChange test (killNodes=true) (weight=4)" group=kkhau
+time="2023-03-23T07:50:01Z" level=info msg="starting test. Steps: 1. create all needed nodes for the test some of which may be killed at step 6 (launch processes; wait 10s); 2. put viewConfig1; 3. get the view from all nodes and expect consistency; 4. do non-causally-dependent writes (all with CM={}) sprayed across all nodes (keys [1, N]); 5. do causally-dependent writes (use CM received after first req in second and so on) sprayed across all nodes (keys [N+1, 2N]); 6. if killNodes==true, wait for eventual consistency and then kill all but one node from each shard; 7. put viewConfig2 (possibly with new nodes if viewConfig2 has more nodes or some have been killed); 8. get the view from all nodes and expect consistency; 9. do reads on writes of step 4 and 5 (from all current nodes, all with CM={}) and expect consistent values from all nodes (tie-breaking) for keys [1, N] and latest values for keys [N+1, 2N]. Steps 7-8 each have 10 points and step 9 has 20 points for a total of 40." group=kkhau killNodes=true test=viewChange viewConfig1="NumNodes: 4, NumShards: 3" viewConfig2="NumNodes: 2, NumShards: 1"
+time="2023-03-23T07:50:01Z" level=info msg="nodes created, sleeping for 10s (to let nodes start up)" group=kkhau test=viewChange
+time="2023-03-23T07:50:11Z" level=info msg="putting view 1 to the nodes (NumNodes: 4, NumShards: 3)" group=kkhau test=viewChange
+time="2023-03-23T07:50:11Z" level=info msg="put view 1 successful" group=kkhau test=viewChange
+time="2023-03-23T07:50:11Z" level=info msg="sleeping for 10s (to let nodes set up the view)" group=kkhau test=viewChange
+time="2023-03-23T07:50:21Z" level=info msg="getting views from nodes and checking consistency" group=kkhau test=viewChange
+time="2023-03-23T07:50:21Z" level=error msg="get view failed: failed to get view from node 10.1.220.29:8080: json: cannot unmarshal number into Go struct field ViewRespShard.View.shard_id of type string" group=kkhau test=viewChange
+time="2023-03-23T07:50:23Z" level=info msg="test completed." finalScore=0 group=kkhau test=viewChange
+time="2023-03-23T07:50:23Z" level=info msg="finished test 12 with score 0/40" group=kkhau
+time="2023-03-23T07:50:23Z" level=warning msg="test 12 did not finish with full score (0/40) (test description: viewChange test (killNodes=true) (weight=4))" group=kkhau
+time="2023-03-23T07:50:23Z" level=info msg="starting test 13: keyDistribution test with n1=6, n2=7 (weight=5, extraCredit=2)" group=kkhau
+time="2023-03-23T07:50:23Z" level=info msg="starting test. Steps: 1. create all needed nodes; 2. put viewConfig1; 3. get view from all nodes and expect consistency; 4. do numKeys causally independent writes sprayed across all nodes; 5. sleep for 11 seconds; 6. expect number of keys in each shard to be within thresholdPercent% of numKeys/s1; 7. put viewConfig2; 8. get view from all nodes and expect consistency; 9. expect number of keys in each shard to be within thresholdPercent% of numKeys/s2; 10. expect number of keys moved to be within thresholdPercent% of numKeys/s2. Steps 4, 6, 9 each have 10 points and step 10 has 20 for a total of 50 (step 10 is extra credit)." group=kkhau numKeys=2000 test=keyDistribution thresholdPercent=25 viewConfig1="NumNodes: 6, NumShards: 6" viewConfig2="NumNodes: 7, NumShards: 7"
+time="2023-03-23T07:50:23Z" level=info msg="nodes created, sleeping for 10s (to let nodes start up)" group=kkhau test=keyDistribution
+time="2023-03-23T07:50:33Z" level=info msg="putting view 1 to the nodes (NumNodes: 6, NumShards: 6)" group=kkhau test=keyDistribution
+time="2023-03-23T07:50:33Z" level=info msg="put view 1 successful" group=kkhau test=keyDistribution
+time="2023-03-23T07:50:33Z" level=info msg="getting views from nodes and checking consistency" group=kkhau test=keyDistribution
+time="2023-03-23T07:50:33Z" level=error msg="get view failed: received bad view from first node: expected n=6 nodes in view but got 0; view={View:[]}" group=kkhau test=keyDistribution
+time="2023-03-23T07:50:38Z" level=info msg="test completed." finalScore=0 group=kkhau test=keyDistribution
+time="2023-03-23T07:50:38Z" level=info msg="finished test 13 with score 0/50" group=kkhau
+time="2023-03-23T07:50:38Z" level=warning msg="test 13 did not finish with full score (0/50) (test description: keyDistribution test with n1=6, n2=7 (weight=5, extraCredit=2))" group=kkhau
+time="2023-03-23T07:50:38Z" level=info msg="starting test 14: keyDistribution test with n1=7, n2=8 (weight=5, extraCredit=2)" group=kkhau
+time="2023-03-23T07:50:38Z" level=info msg="starting test. Steps: 1. create all needed nodes; 2. put viewConfig1; 3. get view from all nodes and expect consistency; 4. do numKeys causally independent writes sprayed across all nodes; 5. sleep for 11 seconds; 6. expect number of keys in each shard to be within thresholdPercent% of numKeys/s1; 7. put viewConfig2; 8. get view from all nodes and expect consistency; 9. expect number of keys in each shard to be within thresholdPercent% of numKeys/s2; 10. expect number of keys moved to be within thresholdPercent% of numKeys/s2. Steps 4, 6, 9 each have 10 points and step 10 has 20 for a total of 50 (step 10 is extra credit)." group=kkhau numKeys=2000 test=keyDistribution thresholdPercent=25 viewConfig1="NumNodes: 7, NumShards: 7" viewConfig2="NumNodes: 8, NumShards: 8"
+time="2023-03-23T07:50:38Z" level=info msg="nodes created, sleeping for 10s (to let nodes start up)" group=kkhau test=keyDistribution
+time="2023-03-23T07:50:48Z" level=info msg="putting view 1 to the nodes (NumNodes: 7, NumShards: 7)" group=kkhau test=keyDistribution
+time="2023-03-23T07:50:48Z" level=info msg="put view 1 successful" group=kkhau test=keyDistribution
+time="2023-03-23T07:50:48Z" level=info msg="getting views from nodes and checking consistency" group=kkhau test=keyDistribution
+time="2023-03-23T07:50:48Z" level=error msg="get view failed: received bad view from first node: expected n=7 nodes in view but got 0; view={View:[]}" group=kkhau test=keyDistribution
+time="2023-03-23T07:50:53Z" level=info msg="test completed." finalScore=0 group=kkhau test=keyDistribution
+time="2023-03-23T07:50:53Z" level=info msg="finished test 14 with score 0/50" group=kkhau
+time="2023-03-23T07:50:53Z" level=warning msg="test 14 did not finish with full score (0/50) (test description: keyDistribution test with n1=7, n2=8 (weight=5, extraCredit=2))" group=kkhau
+time="2023-03-23T07:50:53Z" level=info msg="all tests done, printing scores again" group=kkhau
+time="2023-03-23T07:50:53Z" level=info msg="test 1: score=50/70, weight=2" group=kkhau
+time="2023-03-23T07:50:53Z" level=info msg="test 2: score=50/70, weight=2" group=kkhau
+time="2023-03-23T07:50:53Z" level=info msg="test 3: score=0/50, weight=4" group=kkhau
+time="2023-03-23T07:50:53Z" level=info msg="test 4: score=0/50, weight=4" group=kkhau
+time="2023-03-23T07:50:53Z" level=info msg="test 5: score=30/40, weight=3" group=kkhau
+time="2023-03-23T07:50:53Z" level=info msg="test 6: score=30/40, weight=3" group=kkhau
+time="2023-03-23T07:50:53Z" level=info msg="test 7: score=20/40, weight=3" group=kkhau
+time="2023-03-23T07:50:53Z" level=info msg="test 8: score=20/40, weight=3" group=kkhau
+time="2023-03-23T07:50:53Z" level=info msg="test 9: score=0/40, weight=4" group=kkhau
+time="2023-03-23T07:50:53Z" level=info msg="test 10: score=0/40, weight=4" group=kkhau
+time="2023-03-23T07:50:53Z" level=info msg="test 11: score=0/40, weight=4" group=kkhau
+time="2023-03-23T07:50:53Z" level=info msg="test 12: score=0/40, weight=4" group=kkhau
+time="2023-03-23T07:50:53Z" level=info msg="test 13: score=0/50, weight=5" group=kkhau
+time="2023-03-23T07:50:53Z" level=info msg="test 14: score=0/50, weight=5" group=kkhau
+time="2023-03-23T07:50:53Z" level=info msg="Final score overall: 2.3/10" group=kkhau
